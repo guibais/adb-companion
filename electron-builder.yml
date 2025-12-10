@@ -1,0 +1,47 @@
+appId: com.adbcompanion.app
+productName: ADB Companion
+directories:
+  output: release
+  buildResources: resources
+files:
+  - dist
+  - dist-electron
+  - "!node_modules/**/*"
+  - node_modules/**/*.node
+asarUnpack:
+  - resources/**
+win:
+  icon: resources/icons/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-Windows.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+mac:
+  icon: resources/icons/icon.icns
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  artifactName: ${productName}-${version}-macOS-${arch}.${ext}
+  category: public.app-category.developer-tools
+linux:
+  icon: resources/icons
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-Linux-${arch}.${ext}
+  category: Development
+publish:
+  provider: github
+  releaseType: release

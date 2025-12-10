@@ -1,0 +1,13 @@
+export { ConnectPage } from "./ConnectPage";
+export { DevicePage } from "./DevicePage";
+export { ScreenMirrorPage } from "./ScreenMirrorPage";
+export { AppsPage } from "./AppsPage";
+export { FilesPage } from "./FilesPage";
+export { LogcatPage } from "./LogcatPage";
+export { ShellPage } from "./ShellPage";
+export { ScreenshotPage } from "./ScreenshotPage";
+export { ApkToolsPage } from "./ApkToolsPage";
+export { QuickActionsPage } from "./QuickActionsPage";
+export { BackupPage } from "./BackupPage";
+export { SettingsPage } from "./SettingsPage";
+export { DevToolsPage } from "./DevToolsPage";
