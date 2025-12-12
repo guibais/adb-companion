@@ -65,34 +65,6 @@ export function LogcatPage() {
     };
   }, []);
 
-  const handleStart = () => {
-    if (!activeDevice) return;
-
-    window.electronAPI["adb:logcat-start"](activeDevice.id, {
-      tag: filter.tag || undefined,
-      level: filter.level || undefined,
-      search: filter.search || undefined,
-    });
-    setIsRunning(true);
-    addToast({ type: "success", title: "Logcat started" });
-  };
-
-  const handleStop = () => {
-    if (!activeDevice) return;
-
-    window.electronAPI["adb:logcat-stop"](activeDevice.id);
-    setIsRunning(false);
-    addToast({ type: "info", title: "Logcat stopped" });
-  };
-
-  const handleClear = async () => {
-    if (!activeDevice) return;
-
-    setLogs([]);
-    await window.electronAPI["adb:logcat-clear"](activeDevice.id);
-    addToast({ type: "info", title: "Logs cleared" });
-  };
-
   const handleExport = () => {
     const content = logs
       .map(
@@ -141,6 +113,28 @@ export function LogcatPage() {
       </div>
     );
   }
+
+  const handleStart = () => {
+    window.electronAPI["adb:logcat-start"](activeDevice.id, {
+      tag: filter.tag || undefined,
+      level: filter.level || undefined,
+      search: filter.search || undefined,
+    });
+    setIsRunning(true);
+    addToast({ type: "success", title: "Logcat started" });
+  };
+
+  const handleStop = () => {
+    window.electronAPI["adb:logcat-stop"](activeDevice.id);
+    setIsRunning(false);
+    addToast({ type: "info", title: "Logcat stopped" });
+  };
+
+  const handleClear = async () => {
+    setLogs([]);
+    await window.electronAPI["adb:logcat-clear"](activeDevice.id);
+    addToast({ type: "info", title: "Logs cleared" });
+  };
 
   return (
     <div className="p-6 space-y-4 overflow-hidden h-full flex flex-col">

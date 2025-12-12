@@ -116,9 +116,23 @@ export function QuickActionsPage() {
     ? devices.find((d) => d.id === activeTab.deviceId)
     : null;
 
-  const executeAction = async (action: QuickAction) => {
-    if (!activeDevice) return;
+  if (!activeDevice) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <Power className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+          <h2 className="text-lg font-medium text-white mb-2">
+            No Device Selected
+          </h2>
+          <p className="text-sm text-zinc-500">
+            Connect a device to use quick actions
+          </p>
+        </div>
+      </div>
+    );
+  }
 
+  const executeAction = async (action: QuickAction) => {
     setIsExecuting(action.id);
     try {
       await window.electronAPI["adb:shell"](activeDevice.id, action.command);
@@ -135,8 +149,6 @@ export function QuickActionsPage() {
   };
 
   const handleReboot = async (mode: "normal" | "recovery" | "bootloader") => {
-    if (!activeDevice) return;
-
     try {
       await window.electronAPI["adb:reboot"](activeDevice.id, mode);
       addToast({
@@ -151,8 +163,6 @@ export function QuickActionsPage() {
   };
 
   const handleFactoryReset = async () => {
-    if (!activeDevice) return;
-
     try {
       await window.electronAPI["adb:shell"](
         activeDevice.id,
@@ -164,22 +174,6 @@ export function QuickActionsPage() {
       addToast({ type: "error", title: "Factory reset failed" });
     }
   };
-
-  if (!activeDevice) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <Power className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-          <h2 className="text-lg font-medium text-white mb-2">
-            No Device Selected
-          </h2>
-          <p className="text-sm text-zinc-500">
-            Connect a device to use quick actions
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">

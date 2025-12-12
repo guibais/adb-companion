@@ -77,4 +77,25 @@ describe("SettingsPage", () => {
       "Checking for updates..."
     );
   });
+
+  it("updates scrcpy defaults (resolution and bitrate)", async () => {
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+
+    const resolutionSelect = screen
+      .getByText("Default Resolution")
+      .parentElement?.querySelector("select") as HTMLSelectElement | null;
+    if (!resolutionSelect) throw new Error("Missing default resolution select");
+    await user.selectOptions(resolutionSelect, "720");
+    expect(useSettingsStore.getState().defaultScrcpyResolution).toBe(720);
+
+    const bitrateInput = screen
+      .getByText("Default Bitrate (Mbps)")
+      .parentElement?.querySelector("input") as HTMLInputElement | null;
+    if (!bitrateInput) throw new Error("Missing default bitrate input");
+    await user.clear(bitrateInput);
+    await user.type(bitrateInput, "12");
+    expect(useSettingsStore.getState().defaultScrcpyBitrate).toBe(12);
+  });
 });

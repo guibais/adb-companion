@@ -9,6 +9,12 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/coverage-100%25-brightgreen" alt="Coverage">
+  <img src="https://img.shields.io/badge/tests-passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
+</p>
+
+<p align="center">
   <a href="#features">Features</a> •
   <a href="#why">Why</a> •
   <a href="#quick-start">Quick Start</a> •

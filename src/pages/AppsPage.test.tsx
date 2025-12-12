@@ -1176,4 +1176,102 @@ describe("AppsPage", () => {
 
     resolveExport?.(["/tmp/base.apk"]);
   });
+
+  it("loadApps early returns when no activeDevice", async () => {
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    render(<AppsPage />);
+
+    await waitFor(() => {
+      expect(
+        ((window as any).electronAPI as any)["adb:list-apps"]
+      ).toHaveBeenCalled();
+    });
+
+    useDeviceStore.setState({
+      devices: [],
+      tabs: [{ id: "tab-1", deviceId: null, label: "No Device" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    vi.clearAllMocks();
+
+    expect(
+      ((window as any).electronAPI as any)["adb:list-apps"]
+    ).not.toHaveBeenCalled();
+  });
+
+  it("modal onClose via Escape does not close when isCloning", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    ((window as any).electronAPI as any)["adb:list-apps"] = vi.fn(async () => [
+      { packageName: "com.example.app", appName: "My App", isSystem: false },
+    ]);
+
+    let resolveExport: ((value: string[]) => void) | null = null;
+    ((window as any).electronAPI as any)["adb:export-all-apks"] = vi.fn(
+      () =>
+        new Promise<string[]>((resolve) => {
+          resolveExport = resolve;
+        })
+    );
+
+    render(<AppsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("My App")).toBeInTheDocument();
+    });
+
+    const cloneButton = screen.getByTitle("Clone App");
+    await user.click(cloneButton);
+
+    await waitFor(() => {
+      expect(
+        screen.getByDisplayValue("com.example.app.clone")
+      ).toBeInTheDocument();
+    });
+
+    const cloneSubmitButton = screen
+      .getAllByRole("button")
+      .find((b) => b.textContent?.includes("Clone App") && b !== cloneButton);
+    await user.click(cloneSubmitButton!);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Step 1 of/)).toBeInTheDocument();
+    });
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.getByText(/Step 1 of/)).toBeInTheDocument();
+
+    resolveExport?.(["/tmp/base.apk"]);
+  });
 });

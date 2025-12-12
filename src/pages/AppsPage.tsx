@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   Package,
   Search,
@@ -41,9 +41,8 @@ export function AppsPage() {
     ? devices.find((d) => d.id === activeTab.deviceId)
     : null;
 
-  const loadApps = useCallback(async () => {
+  const loadApps = async () => {
     if (!activeDevice) return;
-
     setIsLoading(true);
     try {
       const appList = await window.electronAPI["adb:list-apps"](
@@ -56,7 +55,7 @@ export function AppsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeDevice?.id, filter, addToast]);
+  };
 
   useEffect(() => {
     if (activeDevice?.id) {
@@ -64,33 +63,29 @@ export function AppsPage() {
     }
   }, [activeDevice?.id, filter]);
 
-  const onDrop = useCallback(
-    async (acceptedFiles: File[]) => {
-      if (!activeDevice) return;
+  const onDrop = async (acceptedFiles: File[]) => {
+    if (!activeDevice) return;
+    const apkFiles = acceptedFiles.filter((f) => f.name.endsWith(".apk"));
+    if (apkFiles.length === 0) {
+      addToast({ type: "warning", title: "No APK files found" });
+      return;
+    }
 
-      const apkFiles = acceptedFiles.filter((f) => f.name.endsWith(".apk"));
-      if (apkFiles.length === 0) {
-        addToast({ type: "warning", title: "No APK files found" });
-        return;
+    setIsInstalling(true);
+    for (const file of apkFiles) {
+      try {
+        await window.electronAPI["adb:install-apk"](
+          activeDevice.id,
+          (file as any).path
+        );
+        addToast({ type: "success", title: `Installed ${file.name}` });
+      } catch (err) {
+        addToast({ type: "error", title: `Failed to install ${file.name}` });
       }
-
-      setIsInstalling(true);
-      for (const file of apkFiles) {
-        try {
-          await window.electronAPI["adb:install-apk"](
-            activeDevice.id,
-            file.path
-          );
-          addToast({ type: "success", title: `Installed ${file.name}` });
-        } catch (err) {
-          addToast({ type: "error", title: `Failed to install ${file.name}` });
-        }
-      }
-      setIsInstalling(false);
-      loadApps();
-    },
-    [activeDevice?.id, loadApps]
-  );
+    }
+    setIsInstalling(false);
+    loadApps();
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -98,9 +93,29 @@ export function AppsPage() {
     noClick: true,
   });
 
-  const handleUninstall = async (packageName: string) => {
-    if (!activeDevice) return;
+  const filteredApps = apps.filter(
+    (app) =>
+      app.packageName.toLowerCase().includes(search.toLowerCase()) ||
+      app.appName.toLowerCase().includes(search.toLowerCase())
+  );
 
+  if (!activeDevice) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <Package className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+          <h2 className="text-lg font-medium text-white mb-2">
+            No Device Selected
+          </h2>
+          <p className="text-sm text-zinc-500">
+            Connect a device to manage apps
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const handleUninstall = async (packageName: string) => {
     try {
       await window.electronAPI["adb:uninstall"](activeDevice.id, packageName);
       addToast({ type: "success", title: "App uninstalled" });
@@ -111,8 +126,6 @@ export function AppsPage() {
   };
 
   const handleClearData = async (packageName: string) => {
-    if (!activeDevice) return;
-
     try {
       await window.electronAPI["adb:clear-data"](activeDevice.id, packageName);
       addToast({ type: "success", title: "App data cleared" });
@@ -122,8 +135,6 @@ export function AppsPage() {
   };
 
   const handleForceStop = async (packageName: string) => {
-    if (!activeDevice) return;
-
     try {
       await window.electronAPI["adb:force-stop"](activeDevice.id, packageName);
       addToast({ type: "success", title: "App stopped" });
@@ -133,8 +144,6 @@ export function AppsPage() {
   };
 
   const handleExportApk = async (app: InstalledApp) => {
-    if (!activeDevice) return;
-
     const savePath = await window.electronAPI["shell:select-save-path"](
       `${app.packageName}.apk`,
       [{ name: "APK Files", extensions: ["apk"] }]
@@ -161,8 +170,6 @@ export function AppsPage() {
   };
 
   const handleCloneApp = async () => {
-    if (!activeDevice || !cloneModal) return;
-
     setIsCloning(true);
     setCloneProgress({
       step: 1,
@@ -176,7 +183,7 @@ export function AppsPage() {
 
       const apkPaths = await window.electronAPI["adb:export-all-apks"](
         activeDevice.id,
-        cloneModal.packageName,
+        cloneModal!.packageName,
         tempDir
       );
 
@@ -250,28 +257,6 @@ export function AppsPage() {
       setCloneProgress({ step: 0, total: 5, message: "" });
     }
   };
-
-  const filteredApps = apps.filter(
-    (app) =>
-      app.packageName.toLowerCase().includes(search.toLowerCase()) ||
-      app.appName.toLowerCase().includes(search.toLowerCase())
-  );
-
-  if (!activeDevice) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <Package className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-          <h2 className="text-lg font-medium text-white mb-2">
-            No Device Selected
-          </h2>
-          <p className="text-sm text-zinc-500">
-            Connect a device to manage apps
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div

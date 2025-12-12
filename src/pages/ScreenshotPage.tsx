@@ -18,54 +18,6 @@ export function ScreenshotPage() {
     ? devices.find((d) => d.id === activeTab.deviceId)
     : null;
 
-  const handleScreenshot = async () => {
-    if (!activeDevice) return;
-
-    setIsCapturing(true);
-    try {
-      const path = await window.electronAPI["adb:screenshot"](activeDevice.id);
-      setLastScreenshot(path);
-      addToast({ type: "success", title: "Screenshot saved", message: path });
-    } catch (err) {
-      addToast({
-        type: "error",
-        title: "Screenshot failed",
-        message: String(err),
-      });
-    } finally {
-      setIsCapturing(false);
-    }
-  };
-
-  const handleStartRecording = async () => {
-    if (!activeDevice) return;
-
-    try {
-      await window.electronAPI["adb:start-recording"](activeDevice.id, {
-        duration: recordingDuration,
-        bitRate: recordingBitrate,
-      });
-      setIsRecording(true);
-      addToast({ type: "success", title: "Recording started" });
-    } catch (err) {
-      addToast({ type: "error", title: "Failed to start recording" });
-    }
-  };
-
-  const handleStopRecording = async () => {
-    if (!activeDevice) return;
-
-    try {
-      const path = await window.electronAPI["adb:stop-recording"](
-        activeDevice.id
-      );
-      setIsRecording(false);
-      addToast({ type: "success", title: "Recording saved", message: path });
-    } catch (err) {
-      addToast({ type: "error", title: "Failed to stop recording" });
-    }
-  };
-
   const toFileUrl = (path: string) => {
     const normalized = path.replace(/\\/g, "/");
     const withLeadingSlash = normalized.startsWith("/")
@@ -95,6 +47,48 @@ export function ScreenshotPage() {
       </div>
     );
   }
+
+  const handleScreenshot = async () => {
+    setIsCapturing(true);
+    try {
+      const path = await window.electronAPI["adb:screenshot"](activeDevice.id);
+      setLastScreenshot(path);
+      addToast({ type: "success", title: "Screenshot saved", message: path });
+    } catch (err) {
+      addToast({
+        type: "error",
+        title: "Screenshot failed",
+        message: String(err),
+      });
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
+  const handleStartRecording = async () => {
+    try {
+      await window.electronAPI["adb:start-recording"](activeDevice.id, {
+        duration: recordingDuration,
+        bitRate: recordingBitrate,
+      });
+      setIsRecording(true);
+      addToast({ type: "success", title: "Recording started" });
+    } catch (err) {
+      addToast({ type: "error", title: "Failed to start recording" });
+    }
+  };
+
+  const handleStopRecording = async () => {
+    try {
+      const path = await window.electronAPI["adb:stop-recording"](
+        activeDevice.id
+      );
+      setIsRecording(false);
+      addToast({ type: "success", title: "Recording saved", message: path });
+    } catch (err) {
+      addToast({ type: "error", title: "Failed to stop recording" });
+    }
+  };
 
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">

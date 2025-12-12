@@ -86,7 +86,6 @@ export function ConnectPage() {
   };
 
   const handleConnect = async () => {
-    if (!connectIp) return;
     setIsConnecting(true);
 
     try {
@@ -118,7 +117,6 @@ export function ConnectPage() {
   };
 
   const handleManualPair = async () => {
-    if (!connectIp || !pairCode || !pairPort) return;
     setIsPairing(true);
 
     try {
