@@ -59,11 +59,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: v${{ needs.release.outputs.new_release_version }}
           fetch-depth: 0
-
-      - name: Pull latest changes
-        run: git pull origin main
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -75,6 +72,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Set package.json version
+        run: node -e "const fs=require('fs'); const pkg=require('./package.json'); pkg.version='${{ needs.release.outputs.new_release_version }}'; fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');"
 
       - name: Build and publish
         env:
