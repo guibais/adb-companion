@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LogcatPage } from "./LogcatPage";
@@ -19,7 +19,10 @@ vi.mock("react-virtuoso", () => {
 });
 
 describe("LogcatPage", () => {
+  let logcatListeners: Array<(entry: any) => void> = [];
+
   beforeEach(() => {
+    logcatListeners = [];
     useUiStore.setState({ toasts: [] } as any);
 
     useDeviceStore.setState({
@@ -38,15 +41,14 @@ describe("LogcatPage", () => {
       async () => undefined
     );
 
-    const listeners: Array<(entry: any) => void> = [];
     (window as any).electronEvents = {
       ...(window as any).electronEvents,
       "logcat:entry": (cb: any) => {
-        listeners.push(cb);
+        logcatListeners.push(cb);
         return () => undefined;
       },
     };
-    (globalThis as any).__logcatListeners = listeners;
+    (globalThis as any).__logcatListeners = logcatListeners;
 
     vi.spyOn(document, "createElement").mockImplementation(((tag: string) => {
       const el = document.createElementNS(
@@ -163,5 +165,377 @@ describe("LogcatPage", () => {
 
     await user.click(screen.getAllByRole("button")[1]);
     expect(useUiStore.getState().toasts.length).toBeGreaterThan(0);
+  });
+
+  it("filters by log level", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    render(<LogcatPage />);
+
+    act(() => {
+      logcatListeners[0]?.({
+        timestamp: "2025-01-01 00:00:00.000",
+        pid: 1,
+        tid: 2,
+        level: "D",
+        tag: "Debug",
+        message: "debug message",
+      });
+      logcatListeners[0]?.({
+        timestamp: "2025-01-01 00:00:01.000",
+        pid: 1,
+        tid: 2,
+        level: "E",
+        tag: "Error",
+        message: "error message",
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("debug message")).toBeInTheDocument();
+      expect(screen.getByText("error message")).toBeInTheDocument();
+    });
+
+    const levelSelect = screen.getByRole("combobox");
+    await user.selectOptions(levelSelect, "E");
+
+    expect(screen.queryByText("debug message")).toBeNull();
+    expect(screen.getByText("error message")).toBeInTheDocument();
+  });
+
+  it("filters by search message", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    render(<LogcatPage />);
+
+    act(() => {
+      logcatListeners[0]?.({
+        timestamp: "2025-01-01 00:00:00.000",
+        pid: 1,
+        tid: 2,
+        level: "I",
+        tag: "Tag1",
+        message: "first message",
+      });
+      logcatListeners[0]?.({
+        timestamp: "2025-01-01 00:00:01.000",
+        pid: 1,
+        tid: 2,
+        level: "I",
+        tag: "Tag2",
+        message: "second message",
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("first message")).toBeInTheDocument();
+    });
+
+    await user.type(
+      screen.getByPlaceholderText("Search messages..."),
+      "second"
+    );
+
+    expect(screen.queryByText("first message")).toBeNull();
+    expect(screen.getByText("second message")).toBeInTheDocument();
+  });
+
+  it("toggles auto-scroll", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    render(<LogcatPage />);
+
+    const autoScrollCheckbox = screen.getByRole("checkbox");
+    expect(autoScrollCheckbox).toBeChecked();
+
+    await user.click(autoScrollCheckbox);
+    expect(autoScrollCheckbox).not.toBeChecked();
+
+    await user.click(autoScrollCheckbox);
+    expect(autoScrollCheckbox).toBeChecked();
+  });
+
+  it("shows waiting for logs when running with no logs", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    render(<LogcatPage />);
+
+    expect(
+      screen.getByText("Click Start to begin capturing logs")
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^Start$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Waiting for logs...")).toBeInTheDocument();
+    });
+  });
+
+  it("displays different log level colors", async () => {
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    render(<LogcatPage />);
+
+    act(() => {
+      logcatListeners[0]?.({
+        timestamp: "2025-01-01 00:00:00.000",
+        pid: 1,
+        tid: 2,
+        level: "V",
+        tag: "Verbose",
+        message: "verbose msg",
+      });
+      logcatListeners[0]?.({
+        timestamp: "2025-01-01 00:00:01.000",
+        pid: 1,
+        tid: 2,
+        level: "D",
+        tag: "Debug",
+        message: "debug msg",
+      });
+      logcatListeners[0]?.({
+        timestamp: "2025-01-01 00:00:02.000",
+        pid: 1,
+        tid: 2,
+        level: "W",
+        tag: "Warning",
+        message: "warning msg",
+      });
+      logcatListeners[0]?.({
+        timestamp: "2025-01-01 00:00:03.000",
+        pid: 1,
+        tid: 2,
+        level: "E",
+        tag: "Error",
+        message: "error msg",
+      });
+      logcatListeners[0]?.({
+        timestamp: "2025-01-01 00:00:04.000",
+        pid: 1,
+        tid: 2,
+        level: "F",
+        tag: "Fatal",
+        message: "fatal msg",
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("verbose msg")).toBeInTheDocument();
+      expect(screen.getByText("debug msg")).toBeInTheDocument();
+      expect(screen.getByText("warning msg")).toBeInTheDocument();
+      expect(screen.getByText("error msg")).toBeInTheDocument();
+      expect(screen.getByText("fatal msg")).toBeInTheDocument();
+    });
+  });
+
+  it("shows recording status when running", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    render(<LogcatPage />);
+
+    expect(screen.getByText("⏸️ Paused")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^Start$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("🔴 Recording")).toBeInTheDocument();
+    });
+  });
+
+  it("passes filter options to logcat-start", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    render(<LogcatPage />);
+
+    await user.type(screen.getByPlaceholderText("Filter by tag..."), "MyApp");
+    await user.type(screen.getByPlaceholderText("Search messages..."), "error");
+    await user.selectOptions(screen.getByRole("combobox"), "W");
+
+    await user.click(screen.getByRole("button", { name: /^Start$/i }));
+
+    expect(
+      ((window as any).electronAPI as any)["adb:logcat-start"]
+    ).toHaveBeenCalledWith("d1", {
+      tag: "MyApp",
+      level: "W",
+      search: "error",
+    });
+  });
+
+  it("filters out logs below selected level", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    render(<LogcatPage />);
+
+    act(() => {
+      logcatListeners[0]?.({
+        timestamp: "2025-01-01 00:00:00.000",
+        pid: 1,
+        tid: 2,
+        level: "V",
+        tag: "Tag",
+        message: "verbose",
+      });
+      logcatListeners[0]?.({
+        timestamp: "2025-01-01 00:00:01.000",
+        pid: 1,
+        tid: 2,
+        level: "I",
+        tag: "Tag",
+        message: "info",
+      });
+      logcatListeners[0]?.({
+        timestamp: "2025-01-01 00:00:02.000",
+        pid: 1,
+        tid: 2,
+        level: "W",
+        tag: "Tag",
+        message: "warning",
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("verbose")).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByRole("combobox"), "I");
+
+    expect(screen.queryByText("verbose")).toBeNull();
+    expect(screen.getByText("info")).toBeInTheDocument();
+    expect(screen.getByText("warning")).toBeInTheDocument();
+  });
+
+  it("does not call start/stop/clear without active device", async () => {
+    render(<LogcatPage />);
+
+    expect(screen.getByText("No Device Selected")).toBeInTheDocument();
+
+    expect(
+      ((window as any).electronAPI as any)["adb:logcat-start"]
+    ).not.toHaveBeenCalled();
+    expect(
+      ((window as any).electronAPI as any)["adb:logcat-stop"]
+    ).not.toHaveBeenCalled();
+    expect(
+      ((window as any).electronAPI as any)["adb:logcat-clear"]
+    ).not.toHaveBeenCalled();
   });
 });

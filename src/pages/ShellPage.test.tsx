@@ -184,4 +184,137 @@ describe("ShellPage", () => {
 
     expect(screen.queryByText("cmd")).toBeNull();
   });
+
+  it("does not execute empty command", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    render(<ShellPage />);
+
+    const input = screen.getByPlaceholderText("Enter shell command...");
+    const getSendButton = () => {
+      const buttons = screen.getAllByRole("button");
+      return buttons[buttons.length - 1];
+    };
+
+    await user.clear(input);
+    await user.click(getSendButton());
+
+    expect(
+      ((window as any).electronAPI as any)["adb:shell"]
+    ).not.toHaveBeenCalled();
+  });
+
+  it("does not execute whitespace-only command", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    render(<ShellPage />);
+
+    const input = screen.getByPlaceholderText("Enter shell command...");
+    await user.type(input, "   ");
+    await user.keyboard("{Enter}");
+
+    expect(
+      ((window as any).electronAPI as any)["adb:shell"]
+    ).not.toHaveBeenCalled();
+  });
+
+  it("executes quick command buttons", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    ((window as any).electronAPI as any)["adb:shell"] = vi.fn(async () => "14");
+
+    render(<ShellPage />);
+
+    const androidVersionButton = screen.getByRole("button", {
+      name: "Android Version",
+    });
+    await user.click(androidVersionButton);
+
+    await waitFor(() => {
+      expect(
+        ((window as any).electronAPI as any)["adb:shell"]
+      ).toHaveBeenCalledWith("d1", "getprop ro.build.version.release");
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("14")).toBeInTheDocument();
+    });
+  });
+
+  it("shows (no output) when command returns empty string", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    ((window as any).electronAPI as any)["adb:shell"] = vi.fn(async () => "");
+
+    render(<ShellPage />);
+
+    const input = screen.getByPlaceholderText("Enter shell command...");
+    await user.type(input, "silent-cmd");
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(screen.getByText("silent-cmd")).toBeInTheDocument();
+      expect(screen.getByText("(no output)")).toBeInTheDocument();
+    });
+  });
 });

@@ -25,12 +25,7 @@ export function Header() {
   const connectedDevices = devices.filter((d) => d.status === "connected");
 
   const handleDeviceClick = (deviceId: string) => {
-    const existingTab = tabs.find((t) => t.deviceId === deviceId);
-    if (existingTab) {
-      setActiveTab(existingTab.id);
-    } else {
-      addTab(deviceId);
-    }
+    addTab(deviceId);
     setCurrentPage("device");
   };
 
