@@ -155,14 +155,10 @@ export function registerIpcHandlers(services: Services) {
 
   ipcMain.handle("binary:check", () => services.binaryManager.checkBinaries());
   ipcMain.handle("binary:download", async (_, name: string) => {
-    await services.binaryManager.downloadBinary(name, (progress) => {
-      getMainWindow()?.webContents.send("download:progress", progress);
-    });
+    await services.binaryManager.downloadBinary(name);
   });
   ipcMain.handle("binary:download-all", async () => {
-    await services.binaryManager.downloadAllBinaries((progress) => {
-      getMainWindow()?.webContents.send("download:progress", progress);
-    });
+    await services.binaryManager.downloadAllBinaries();
   });
 
   ipcMain.handle("apk:get-info", (_, apkPath: string) =>

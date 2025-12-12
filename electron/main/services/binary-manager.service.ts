@@ -166,7 +166,19 @@ export class BinaryManagerService {
       return "";
     }
 
-    return join(basePath, config.executable + ext);
+    const directPath = join(basePath, config.executable + ext);
+    if (existsSync(directPath)) return directPath;
+
+    if (config.name === "platform-tools") {
+      const nestedPath = join(
+        basePath,
+        "platform-tools",
+        config.executable + ext
+      );
+      if (existsSync(nestedPath)) return nestedPath;
+    }
+
+    return directPath;
   }
 
   async checkBinaries(): Promise<BinaryStatus> {

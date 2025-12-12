@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Wrench, Upload, Package, FileText, Copy, Edit3 } from "lucide-react";
+import { Upload, Package, Copy, Edit3 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
+import type { FileWithPath } from "react-dropzone";
 import { Button, Input, ProgressBar, PageHeader } from "../components/ui";
 import { useUiStore } from "../stores";
 import type { ApkInfo } from "../types";
@@ -15,10 +16,15 @@ export function ApkToolsPage() {
   const [newAppName, setNewAppName] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
 
-  const onDrop = async (acceptedFiles: File[]) => {
+  const onDrop = async (acceptedFiles: FileWithPath[]) => {
     const apkFile = acceptedFiles.find((f) => f.name.endsWith(".apk"));
     if (!apkFile) {
       addToast({ type: "warning", title: "Please select an APK file" });
+      return;
+    }
+
+    if (!apkFile.path) {
+      addToast({ type: "error", title: "Failed to read APK" });
       return;
     }
 
@@ -53,7 +59,12 @@ export function ApkToolsPage() {
     });
 
     if (path) {
-      onDrop([{ path, name: path.split("/").pop() || "app.apk" } as File]);
+      onDrop([
+        {
+          path,
+          name: path.split("/").pop() || "app.apk",
+        } as unknown as FileWithPath,
+      ]);
     }
   };
 

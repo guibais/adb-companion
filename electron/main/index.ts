@@ -15,6 +15,8 @@ process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
   ? join(process.env.DIST_ELECTRON, "../public")
   : process.env.DIST;
 
+app.setName("ADB Companion");
+
 let mainWindow: BrowserWindow | null = null;
 
 const preload = join(__dirname, "../preload/index.js");
@@ -41,7 +43,6 @@ async function createWindow() {
     height: 900,
     minWidth: 1000,
     minHeight: 700,
-    icon: join(process.env.VITE_PUBLIC || "", "icon.png"),
     webPreferences: {
       preload,
       nodeIntegration: false,

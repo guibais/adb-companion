@@ -5,6 +5,25 @@
       <stop offset="100%" style="stop-color:#16a34a;stop-opacity:1" />
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="96" fill="url(#grad)"/>
-  <text x="256" y="320" font-family="Arial, sans-serif" font-size="280" font-weight="bold" fill="white" text-anchor="middle">A</text>
+
+  <rect width="512" height="512" rx="96" fill="url(#grad)" />
+
+  <g fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M170 362 L256 146 L342 362" stroke-width="52" />
+    <path d="M210 286 H302" stroke-width="52" />
+  </g>
+
+  <g fill="none" stroke="#f97316" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M256 218 V318" stroke-width="22" />
+    <path d="M256 240 L224 220" stroke-width="22" />
+    <path d="M256 252 L288 232" stroke-width="22" />
+    <path d="M256 218 L256 194" stroke-width="22" />
+  </g>
+
+  <g fill="#f97316">
+    <circle cx="224" cy="220" r="10" />
+    <rect x="281" y="225" width="14" height="14" rx="3" />
+    <path d="M256 176 L270 200 H242 Z" />
+    <rect x="249" y="318" width="14" height="34" rx="7" />
+  </g>
 </svg>

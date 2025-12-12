@@ -304,7 +304,7 @@ export function AppsPage() {
             });
             if (path)
               onDrop([
-                { path, name: path.split("/").pop() || "app.apk" } as File,
+                { path, name: path.split("/").pop() || "app.apk" } as any,
               ]);
           }}
           loading={isInstalling}

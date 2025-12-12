@@ -7,7 +7,7 @@ import type {
   Device,
   WifiPairingInfo,
   DevToolDownloadProgress,
-} from "../src/types";
+} from "../../src/types";
 
 const api: IpcApi = {
   "adb:list-devices": () => ipcRenderer.invoke("adb:list-devices"),

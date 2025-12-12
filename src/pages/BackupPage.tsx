@@ -1,12 +1,6 @@
 import { useState } from "react";
-import {
-  HardDrive,
-  Upload,
-  Download,
-  FolderOpen,
-  AlertTriangle,
-} from "lucide-react";
-import { Button, ProgressBar, PageHeader } from "../components/ui";
+import { HardDrive, Upload, Download, AlertTriangle } from "lucide-react";
+import { Button, PageHeader } from "../components/ui";
 import { useDeviceStore, useUiStore } from "../stores";
 
 export function BackupPage() {

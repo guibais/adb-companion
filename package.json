@@ -1,5 +1,6 @@
 {
   "name": "adb-companion",
+  "productName": "ADB Companion",
   "version": "1.0.0",
   "description": "A comprehensive GUI wrapper for Android Debug Bridge (ADB) and related tools",
   "main": "dist-electron/main/index.js",
@@ -9,7 +10,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && electron-builder",
+    "build": "tsc -p tsconfig.node.json && tsc && vite build && electron-builder",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"electron .\"",
     "test": "vitest",

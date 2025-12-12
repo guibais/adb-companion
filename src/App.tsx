@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Header, StatusBar, Sidemenu } from "./components/layout";
-import { ToastContainer } from "./components/ui";
+import { LoadingScreen, ToastContainer } from "./components/ui";
 import { SetupScreen } from "./components/setup";
 import {
   ConnectPage,
@@ -67,10 +67,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (isHydrated) {
+    if (isHydrated && isSetupComplete) {
       checkSetup();
     }
-  }, [isHydrated]);
+  }, [isHydrated, isSetupComplete]);
 
   const checkSetup = async () => {
     setChecking(true);
@@ -85,7 +85,15 @@ export default function App() {
   };
 
   if (!isHydrated) {
-    return null;
+    return (
+      <>
+        <LoadingScreen
+          title="Starting ADB Companion"
+          subtitle="Loading your settings..."
+        />
+        <ToastContainer />
+      </>
+    );
   }
 
   if (!isSetupComplete) {

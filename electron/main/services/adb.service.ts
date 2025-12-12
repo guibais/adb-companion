@@ -27,9 +27,15 @@ export class AdbService {
     const platformToolsPath = join(userDataPath, "binaries", "platform-tools");
     const adbName = process.platform === "win32" ? "adb.exe" : "adb";
     const localPath = join(platformToolsPath, adbName);
+    const nestedPath = join(platformToolsPath, "platform-tools", adbName);
 
     if (existsSync(localPath)) {
       this.adbPath = localPath;
+      return this.adbPath;
+    }
+
+    if (existsSync(nestedPath)) {
+      this.adbPath = nestedPath;
       return this.adbPath;
     }
 

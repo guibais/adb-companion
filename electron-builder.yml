@@ -1,17 +1,17 @@
 appId: com.adbcompanion.app
 productName: ADB Companion
+executableName: adb-companion
 directories:
   output: release
   buildResources: resources
 files:
   - dist
   - dist-electron
-  - "!node_modules/**/*"
-  - node_modules/**/*.node
+  - node_modules/**
 asarUnpack:
   - resources/**
 win:
-  icon: resources/icons/icon.ico
+  icon: resources/icons/icon.png
   target:
     - target: nsis
       arch:
@@ -23,7 +23,7 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
 mac:
-  icon: resources/icons/icon.icns
+  icon: resources/icons/icon.png
   target:
     - target: dmg
       arch:
@@ -32,7 +32,7 @@ mac:
   artifactName: ${productName}-${version}-macOS-${arch}.${ext}
   category: public.app-category.developer-tools
 linux:
-  icon: resources/icons
+  icon: resources/icons/512x512.png
   target:
     - target: AppImage
       arch:

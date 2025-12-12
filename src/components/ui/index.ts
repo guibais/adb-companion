@@ -4,3 +4,4 @@ export { ProgressBar } from "./ProgressBar";
 export { Modal } from "./Modal";
 export { ToastContainer } from "./Toast";
 export { PageHeader } from "./PageHeader";
+export { LoadingScreen } from "./LoadingScreen";
