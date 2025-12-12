@@ -85,10 +85,12 @@ describe("LogcatPage", () => {
 
     render(<LogcatPage />);
 
-    await user.click(screen.getByRole("button", { name: /Start/i }));
-    expect(
-      ((window as any).electronAPI as any)["adb:logcat-start"]
-    ).toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: /^Start$/i }));
+    await waitFor(() => {
+      expect(
+        ((window as any).electronAPI as any)["adb:logcat-start"]
+      ).toHaveBeenCalled();
+    });
 
     const listeners = (globalThis as any).__logcatListeners as Array<
       (e: any) => void
@@ -114,7 +116,10 @@ describe("LogcatPage", () => {
       ((window as any).electronAPI as any)["adb:logcat-stop"]
     ).toHaveBeenCalled();
 
-    await user.click(screen.getAllByRole("button")[0]);
+    const clearSvg = document.querySelector("svg.lucide-trash2");
+    const clearButton = clearSvg?.closest("button") as HTMLButtonElement | null;
+    if (!clearButton) throw new Error("Missing clear button");
+    await user.click(clearButton);
     expect(
       ((window as any).electronAPI as any)["adb:logcat-clear"]
     ).toHaveBeenCalled();
