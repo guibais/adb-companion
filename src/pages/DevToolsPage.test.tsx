@@ -1,6 +1,6 @@
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { DevToolsPage } from "./DevToolsPage";
 import { useUiStore } from "../stores";
 
@@ -33,6 +33,11 @@ describe("DevToolsPage", () => {
     ((window as any).electronAPI as any)["devtools:stop"] = vi.fn(
       async () => undefined
     );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it("renders empty state when no tools", async () => {
@@ -340,5 +345,77 @@ describe("DevToolsPage", () => {
     });
 
     expect(screen.getByText("Installed")).toBeInTheDocument();
+  });
+
+  it("calls loadTools after completed progress", async () => {
+    const checkMock = vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          id: "reactotron",
+          name: "Reactotron",
+          description: "Desc",
+          version: "1",
+          isInstalled: false,
+          isRunning: false,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "reactotron",
+          name: "Reactotron",
+          description: "Desc",
+          version: "1",
+          isInstalled: true,
+          isRunning: false,
+          path: "/tmp/reactotron",
+        },
+      ]);
+
+    ((window as any).electronAPI as any)["devtools:check"] = checkMock;
+
+    render(<DevToolsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Reactotron")).toBeInTheDocument();
+    });
+
+    vi.useFakeTimers();
+
+    act(() => {
+      devtoolsProgressCallback?.({
+        id: "reactotron",
+        status: "completed",
+        percentage: 100,
+        speed: 0,
+        downloadedBytes: 0,
+        totalBytes: 0,
+      });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(checkMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("logs error when loadTools fails", async () => {
+    const consoleSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    ((window as any).electronAPI as any)["devtools:check"] = vi.fn(async () => {
+      throw new Error("check failed");
+    });
+
+    render(<DevToolsPage />);
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Failed to load tools:",
+        expect.any(Error)
+      );
+    });
   });
 });

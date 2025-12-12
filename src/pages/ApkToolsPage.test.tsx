@@ -311,4 +311,51 @@ describe("ApkToolsPage", () => {
 
     expect(screen.queryByText(/Permissions \(/)).toBeNull();
   });
+
+  it("uses fallback name app.apk when path has no filename", async () => {
+    const user = userEvent.setup();
+
+    ((window as any).electronAPI as any)["shell:select-file"] = vi.fn(
+      async () => "/"
+    );
+
+    render(<ApkToolsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Browse Files/i }));
+
+    await waitFor(() => {
+      expect(
+        ((window as any).electronAPI as any)["apk:get-info"]
+      ).toHaveBeenCalledWith("/");
+    });
+  });
+
+  it("does not rename when newPackageName is empty", async () => {
+    const user = userEvent.setup();
+
+    render(<ApkToolsPage />);
+
+    await act(async () => {
+      await dropHandler?.([
+        { name: "app.apk", path: "/tmp/app.apk" } as any as File,
+      ]);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("My App")).toBeInTheDocument();
+    });
+
+    const packageNameInput = screen.getByPlaceholderText(
+      "com.example.app.clone"
+    );
+    await user.clear(packageNameInput);
+
+    await user.click(
+      screen.getByRole("button", { name: /Create Modified APK/i })
+    );
+
+    expect(
+      ((window as any).electronAPI as any)["apk:rename-package"]
+    ).not.toHaveBeenCalled();
+  });
 });

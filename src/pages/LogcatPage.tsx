@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FileText, Play, Square, Trash2, Download, Filter } from "lucide-react";
 import { Virtuoso } from "react-virtuoso";
 import { Button, Input, PageHeader } from "../components/ui";
@@ -41,6 +41,17 @@ export function LogcatPage() {
     ? devices.find((d) => d.id === activeTab.deviceId)
     : null;
 
+  const isRunningRef = useRef(false);
+  const activeDeviceIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    isRunningRef.current = isRunning;
+  }, [isRunning]);
+
+  useEffect(() => {
+    activeDeviceIdRef.current = activeDevice?.id ?? null;
+  }, [activeDevice?.id]);
+
   useEffect(() => {
     const unsubscribe = window.electronEvents["logcat:entry"]((entry) => {
       setLogs((prev) => [...prev.slice(-5000), entry]);
@@ -48,8 +59,8 @@ export function LogcatPage() {
 
     return () => {
       unsubscribe();
-      if (activeDevice && isRunning) {
-        window.electronAPI["adb:logcat-stop"](activeDevice.id);
+      if (activeDeviceIdRef.current && isRunningRef.current) {
+        window.electronAPI["adb:logcat-stop"](activeDeviceIdRef.current);
       }
     };
   }, []);

@@ -1,4 +1,10 @@
-import { render, screen, waitFor, act } from "@testing-library/react";
+import {
+  render,
+  screen,
+  waitFor,
+  act,
+  fireEvent,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConnectPage } from "./ConnectPage";
@@ -443,6 +449,168 @@ describe("ConnectPage", () => {
     await user.click(usbCard);
 
     expect(screen.getByText("Scanning for devices...")).toBeInTheDocument();
+  });
+
+  it("logs refreshDevices error to console.error", async () => {
+    const user = userEvent.setup();
+    const consoleSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    ((window as any).electronAPI as any)["adb:list-devices"] = vi.fn(
+      async () => {
+        throw new Error("boom");
+      }
+    );
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          manufacturer: "Google",
+          androidVersion: "14",
+          sdkVersion: 34,
+          status: "connected",
+          connectionType: "usb",
+        },
+      ],
+    } as any);
+
+    render(<ConnectPage />);
+
+    const refreshButton = screen.getByRole("button", { name: /Refresh/i });
+    await user.click(refreshButton);
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Failed to refresh devices:",
+        expect.any(Error)
+      );
+    });
+  });
+
+  it("closeWifiModal stops pairing and resets form", async () => {
+    const user = userEvent.setup();
+
+    render(<ConnectPage />);
+
+    const wifiCard = screen.getByText("WiFi Connection").closest("button");
+    if (!wifiCard) throw new Error("Missing WiFi Connection button");
+    await user.click(wifiCard);
+
+    await waitFor(() => {
+      expect(
+        ((window as any).electronAPI as any)["wifi:start-pairing"]
+      ).toHaveBeenCalled();
+    });
+
+    const inputs = screen.getAllByRole("textbox");
+    await user.type(inputs[0], "192.168.0.10");
+
+    const backdrop = document.querySelector(
+      ".fixed.inset-0.z-50 .absolute.inset-0"
+    ) as HTMLDivElement | null;
+    if (!backdrop) throw new Error("Missing modal backdrop");
+    fireEvent.click(backdrop);
+
+    expect(
+      ((window as any).electronAPI as any)["wifi:stop-pairing"]
+    ).toHaveBeenCalled();
+
+    await user.click(wifiCard);
+
+    await waitFor(() => {
+      expect(
+        ((window as any).electronAPI as any)["wifi:start-pairing"]
+      ).toHaveBeenCalledTimes(2);
+    });
+
+    const inputsAfter = screen.getAllByRole("textbox");
+    expect((inputsAfter[0] as HTMLInputElement).value).toBe("");
+  });
+
+  it("renders USB card non-scanning style after opening WiFi modal", async () => {
+    const user = userEvent.setup();
+
+    render(<ConnectPage />);
+
+    const wifiCard = screen.getByText("WiFi Connection").closest("button");
+    if (!wifiCard) throw new Error("Missing WiFi Connection button");
+    await user.click(wifiCard);
+
+    const usbCard = screen.getByText("USB Connection").closest("button");
+    if (!usbCard) throw new Error("Missing USB Connection button");
+    expect(usbCard.className).toContain("border-border");
+  });
+
+  it("shows Pairing... indicator when pairingInfo.state is pairing", async () => {
+    const user = userEvent.setup();
+
+    ((window as any).electronAPI as any)["wifi:start-pairing"] = vi.fn(
+      async () => ({
+        qrCodeDataUrl: "data:image/png;base64,xyz",
+        state: "pairing",
+      })
+    );
+
+    render(<ConnectPage />);
+
+    const wifiCard = screen.getByText("WiFi Connection").closest("button");
+    if (!wifiCard) throw new Error("Missing WiFi Connection button");
+    await user.click(wifiCard);
+
+    await waitFor(() => {
+      expect(screen.getByText("Pairing...")).toBeInTheDocument();
+    });
+  });
+
+  it("early returns in handleConnect when connectIp is empty", async () => {
+    const user = userEvent.setup();
+
+    render(<ConnectPage />);
+
+    const wifiCard = screen.getByText("WiFi Connection").closest("button");
+    if (!wifiCard) throw new Error("Missing WiFi Connection button");
+    await user.click(wifiCard);
+
+    await waitFor(() => {
+      expect(
+        ((window as any).electronAPI as any)["wifi:start-pairing"]
+      ).toHaveBeenCalled();
+    });
+
+    await user.click(screen.getByRole("button", { name: /Skip/i }));
+
+    const connectButton = screen.getByRole("button", { name: /^Connect$/i });
+    fireEvent.click(connectButton);
+
+    expect(
+      ((window as any).electronAPI as any)["wifi:connect"]
+    ).not.toHaveBeenCalled();
+  });
+
+  it("early returns in handleManualPair when inputs missing", async () => {
+    const user = userEvent.setup();
+
+    render(<ConnectPage />);
+
+    const wifiCard = screen.getByText("WiFi Connection").closest("button");
+    if (!wifiCard) throw new Error("Missing WiFi Connection button");
+    await user.click(wifiCard);
+
+    await waitFor(() => {
+      expect(
+        ((window as any).electronAPI as any)["wifi:start-pairing"]
+      ).toHaveBeenCalled();
+    });
+
+    const pairButton = screen.getByRole("button", { name: /^Pair$/i });
+    fireEvent.click(pairButton);
+
+    expect(
+      ((window as any).electronAPI as any)["wifi:manual-pair"]
+    ).not.toHaveBeenCalled();
   });
 
   it("shows offline device status", async () => {

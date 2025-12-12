@@ -27,9 +27,23 @@ export function BackupPage() {
     ? devices.find((d) => d.id === activeTab.deviceId)
     : null;
 
-  const handleBackup = async () => {
-    if (!activeDevice) return;
+  if (!activeDevice) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <HardDrive className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+          <h2 className="text-lg font-medium text-white mb-2">
+            No Device Selected
+          </h2>
+          <p className="text-sm text-zinc-500">
+            Connect a device to backup/restore
+          </p>
+        </div>
+      </div>
+    );
+  }
 
+  const handleBackup = async () => {
     const savePath = await window.electronAPI["shell:select-save-path"](
       `backup_${activeDevice.model.replace(/\s/g, "_")}_${Date.now()}.ab`,
       [{ name: "Android Backup", extensions: ["ab"] }]
@@ -57,8 +71,6 @@ export function BackupPage() {
   };
 
   const handleRestore = async () => {
-    if (!activeDevice) return;
-
     const backupPath = await window.electronAPI["shell:select-file"]({
       filters: [{ name: "Android Backup", extensions: ["ab"] }],
     });
@@ -83,22 +95,6 @@ export function BackupPage() {
       setIsRestoring(false);
     }
   };
-
-  if (!activeDevice) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <HardDrive className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-          <h2 className="text-lg font-medium text-white mb-2">
-            No Device Selected
-          </h2>
-          <p className="text-sm text-zinc-500">
-            Connect a device to backup/restore
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">

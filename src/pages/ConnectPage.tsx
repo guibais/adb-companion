@@ -161,6 +161,7 @@ export function ConnectPage() {
 
   const openWifiModal = async () => {
     resetWifiForm();
+    setIsScanning(false);
     setShowWifiModal(true);
 
     try {

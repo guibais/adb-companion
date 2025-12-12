@@ -20,10 +20,16 @@ vi.mock("react-virtuoso", () => {
 
 describe("LogcatPage", () => {
   let logcatListeners: Array<(entry: any) => void> = [];
+  let anchorEl: any;
 
   beforeEach(() => {
     logcatListeners = [];
     useUiStore.setState({ toasts: [] } as any);
+
+    vi.spyOn(Date, "now").mockReturnValue(1735689600000);
+
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
 
     useDeviceStore.setState({
       devices: [],
@@ -50,13 +56,15 @@ describe("LogcatPage", () => {
     };
     (globalThis as any).__logcatListeners = logcatListeners;
 
+    anchorEl = null;
     vi.spyOn(document, "createElement").mockImplementation(((tag: string) => {
       const el = document.createElementNS(
         "http://www.w3.org/1999/xhtml",
         tag
       ) as any;
       if (tag === "a") {
-        el.click = () => undefined;
+        el.click = vi.fn(() => undefined);
+        anchorEl = el;
       }
       return el;
     }) as any);
@@ -163,8 +171,93 @@ describe("LogcatPage", () => {
       expect(screen.getByText("hello")).toBeInTheDocument();
     });
 
-    await user.click(screen.getAllByRole("button")[1]);
+    const downloadSvg = document.querySelector("svg.lucide-download");
+    const exportButton = downloadSvg?.closest(
+      "button"
+    ) as HTMLButtonElement | null;
+    if (!exportButton) throw new Error("Missing export button");
+    await user.click(exportButton);
+    expect(URL.createObjectURL).toHaveBeenCalled();
+    expect(anchorEl?.download).toBe("logcat_1735689600000.txt");
+    expect(anchorEl?.href).toBe("blob:mock");
+    expect(anchorEl?.click).toHaveBeenCalled();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock");
     expect(useUiStore.getState().toasts.length).toBeGreaterThan(0);
+  });
+
+  it("stops logcat on unmount when running", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    const { unmount } = render(<LogcatPage />);
+
+    await user.click(screen.getByRole("button", { name: /^Start$/i }));
+
+    await waitFor(() => {
+      expect(
+        ((window as any).electronAPI as any)["adb:logcat-start"]
+      ).toHaveBeenCalled();
+    });
+
+    unmount();
+
+    expect(
+      ((window as any).electronAPI as any)["adb:logcat-stop"]
+    ).toHaveBeenCalledWith("d1");
+  });
+
+  it("filters out logs when tag does not match", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    render(<LogcatPage />);
+
+    act(() => {
+      logcatListeners[0]?.({
+        timestamp: "2025-01-01 00:00:00.000",
+        pid: 1,
+        tid: 2,
+        level: "I",
+        tag: "RealTag",
+        message: "hello",
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("hello")).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByPlaceholderText("Filter by tag..."), "Nope");
+
+    expect(screen.queryByText("hello")).toBeNull();
   });
 
   it("filters by log level", async () => {

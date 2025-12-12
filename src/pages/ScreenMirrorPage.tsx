@@ -32,9 +32,23 @@ export function ScreenMirrorPage() {
     ? devices.find((d) => d.id === activeTab.deviceId)
     : null;
 
-  const handleStart = async () => {
-    if (!activeDevice) return;
+  if (!activeDevice) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <Monitor className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+          <h2 className="text-lg font-medium text-white mb-2">
+            No Device Selected
+          </h2>
+          <p className="text-sm text-zinc-500">
+            Connect a device to start screen mirroring
+          </p>
+        </div>
+      </div>
+    );
+  }
 
+  const handleStart = async () => {
     setIsLoading(true);
     try {
       const scrcpyOptions: ScrcpyOptions = {
@@ -62,10 +76,8 @@ export function ScreenMirrorPage() {
   };
 
   const handleStop = async () => {
-    if (processId === null) return;
-
     try {
-      await window.electronAPI["scrcpy:stop"](processId);
+      await window.electronAPI["scrcpy:stop"](processId as number);
       setIsRunning(false);
       setProcessId(null);
       addToast({ type: "info", title: "Screen mirroring stopped" });
@@ -73,22 +85,6 @@ export function ScreenMirrorPage() {
       addToast({ type: "error", title: "Failed to stop scrcpy" });
     }
   };
-
-  if (!activeDevice) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <Monitor className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-          <h2 className="text-lg font-medium text-white mb-2">
-            No Device Selected
-          </h2>
-          <p className="text-sm text-zinc-500">
-            Connect a device to start screen mirroring
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">
@@ -105,7 +101,12 @@ export function ScreenMirrorPage() {
           Settings
         </Button>
         {isRunning ? (
-          <Button variant="danger" size="sm" onClick={handleStop}>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={handleStop}
+            disabled={processId === null}
+          >
             <Square className="w-4 h-4" />
             Stop
           </Button>
