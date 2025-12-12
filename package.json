@@ -15,7 +15,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint . --ignore-pattern '**/*.test.tsx' --ignore-pattern '**/*.test.ts'",
+    "lint": "eslint .",
     "package": "pnpm run build && electron-builder",
     "package:win": "pnpm run build && electron-builder --win",
     "package:mac": "pnpm run build && electron-builder --mac",
