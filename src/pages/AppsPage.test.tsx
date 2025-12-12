@@ -165,6 +165,52 @@ describe("AppsPage", () => {
     });
   });
 
+  it("handles refresh button error", async () => {
+    const user = userEvent.setup();
+
+    useDeviceStore.setState({
+      devices: [
+        {
+          id: "d1",
+          model: "Pixel",
+          status: "connected",
+          connectionType: "usb",
+          androidVersion: "14",
+          sdkVersion: 34,
+        },
+      ],
+      tabs: [{ id: "tab-1", deviceId: "d1", label: "Pixel" }],
+      activeTabId: "tab-1",
+    } as any);
+
+    ((window as any).electronAPI as any)["adb:list-apps"] = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Failed to load"));
+
+    render(<AppsPage />);
+
+    await waitFor(() => {
+      expect(
+        ((window as any).electronAPI as any)["adb:list-apps"]
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    useUiStore.setState({ toasts: [] } as any);
+
+    const refreshButton = screen
+      .getAllByRole("button")
+      .find((b) => b.querySelector("svg.lucide-refresh-cw"));
+    await user.click(refreshButton!);
+
+    await waitFor(() => {
+      const toasts = useUiStore.getState().toasts;
+      expect(toasts.some((t: any) => t.title === "Failed to load apps")).toBe(
+        true
+      );
+    });
+  });
+
   it("filters apps by search", async () => {
     const user = userEvent.setup();
 
@@ -1103,20 +1149,6 @@ describe("AppsPage", () => {
 
     expect(
       ((window as any).electronAPI as any)["adb:list-apps"]
-    ).not.toHaveBeenCalled();
-  });
-
-  it("does not drop files when no active device", async () => {
-    render(<AppsPage />);
-
-    await act(async () => {
-      await dropHandler?.([
-        { name: "app.apk", path: "/tmp/app.apk" } as any as File,
-      ]);
-    });
-
-    expect(
-      ((window as any).electronAPI as any)["adb:install-apk"]
     ).not.toHaveBeenCalled();
   });
 

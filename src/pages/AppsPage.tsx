@@ -41,8 +41,48 @@ export function AppsPage() {
     ? devices.find((d) => d.id === activeTab.deviceId)
     : null;
 
+  useEffect(() => {
+    if (!activeDevice?.id) return;
+    const fetchApps = async () => {
+      setIsLoading(true);
+      try {
+        const appList = await window.electronAPI["adb:list-apps"](
+          activeDevice.id,
+          filter
+        );
+        setApps(appList);
+      } catch {
+        addToast({ type: "error", title: "Failed to load apps" });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchApps();
+  }, [activeDevice?.id, filter, addToast]);
+
+  const filteredApps = apps.filter(
+    (app) =>
+      app.packageName.toLowerCase().includes(search.toLowerCase()) ||
+      app.appName.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (!activeDevice) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <Package className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+          <h2 className="text-lg font-medium text-white mb-2">
+            No Device Selected
+          </h2>
+          <p className="text-sm text-zinc-500">
+            Connect a device to manage apps
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const loadApps = async () => {
-    if (!activeDevice) return;
     setIsLoading(true);
     try {
       const appList = await window.electronAPI["adb:list-apps"](
@@ -57,14 +97,7 @@ export function AppsPage() {
     }
   };
 
-  useEffect(() => {
-    if (activeDevice?.id) {
-      loadApps();
-    }
-  }, [activeDevice?.id, filter]);
-
   const onDrop = async (acceptedFiles: File[]) => {
-    if (!activeDevice) return;
     const apkFiles = acceptedFiles.filter((f) => f.name.endsWith(".apk"));
     if (apkFiles.length === 0) {
       addToast({ type: "warning", title: "No APK files found" });
@@ -92,28 +125,6 @@ export function AppsPage() {
     accept: { "application/vnd.android.package-archive": [".apk"] },
     noClick: true,
   });
-
-  const filteredApps = apps.filter(
-    (app) =>
-      app.packageName.toLowerCase().includes(search.toLowerCase()) ||
-      app.appName.toLowerCase().includes(search.toLowerCase())
-  );
-
-  if (!activeDevice) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <Package className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-          <h2 className="text-lg font-medium text-white mb-2">
-            No Device Selected
-          </h2>
-          <p className="text-sm text-zinc-500">
-            Connect a device to manage apps
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   const handleUninstall = async (packageName: string) => {
     try {
