@@ -226,4 +226,32 @@ describe("App", () => {
       expect(screen.getByTestId("connect-page")).toBeInTheDocument();
     });
   });
+
+  it("triggers hydration callback when onFinishHydration fires", async () => {
+    let hydrationCallback: (() => void) | null = null;
+
+    (useUiStore.persist as any).hasHydrated = vi.fn(() => false);
+    (useUiStore.persist as any).onFinishHydration = vi.fn((cb: () => void) => {
+      hydrationCallback = cb;
+      return () => {};
+    });
+
+    useUiStore.setState({
+      isSetupComplete: true,
+      currentPage: "connect",
+    } as any);
+
+    const { container, rerender } = render(<App />);
+    expect(container.firstChild).toBeNull();
+
+    if (hydrationCallback) {
+      (hydrationCallback as () => void)();
+    }
+
+    rerender(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("header")).toBeInTheDocument();
+    });
+  });
 });

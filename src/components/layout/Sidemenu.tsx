@@ -12,6 +12,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useUiStore } from "../../stores";
+import packageJson from "../../../package.json";
 
 type Page =
   | "device"
@@ -147,6 +148,11 @@ export function Sidemenu() {
       </div>
 
       <div className="p-2 border-t border-border">
+        {!sidebarCollapsed && (
+          <div className="text-xs text-zinc-600 text-center mb-2">
+            v{packageJson.version}
+          </div>
+        )}
         <button
           onClick={toggleSidebar}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-zinc-500 hover:text-white hover:bg-bg-tertiary transition-colors"

@@ -1,8 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Sidemenu } from "./Sidemenu";
 import { useUiStore } from "../../stores";
+
+vi.mock("../../../package.json", () => ({
+  default: { version: "1.2.3" },
+}));
 
 describe("Sidemenu", () => {
   beforeEach(() => {
@@ -31,5 +35,20 @@ describe("Sidemenu", () => {
 
     await user.click(screen.getByRole("button", { name: "Collapse" }));
     expect(useUiStore.getState().sidebarCollapsed).toBe(true);
+  });
+
+  it("displays version when expanded", () => {
+    render(<Sidemenu />);
+    expect(screen.getByText("v1.2.3")).toBeInTheDocument();
+  });
+
+  it("hides version when collapsed", () => {
+    useUiStore.setState({
+      currentPage: "device",
+      sidebarCollapsed: true,
+    } as any);
+
+    render(<Sidemenu />);
+    expect(screen.queryByText("v1.2.3")).toBeNull();
   });
 });
