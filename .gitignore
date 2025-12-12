@@ -7,3 +7,4 @@ release/
 *.local
 .env
 .env.*
+coverage
