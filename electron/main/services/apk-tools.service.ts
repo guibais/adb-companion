@@ -8,7 +8,7 @@ import {
   writeFileSync,
   readdirSync,
 } from "fs";
-import type { ApkInfo, ApkRenameOptions } from "../../src/types/app.types";
+import type { ApkInfo, ApkRenameOptions } from "../../../src/types/app.types";
 
 export class ApkToolsService {
   private replacePackageInManifest(

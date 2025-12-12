@@ -13,13 +13,12 @@ import {
   ScreenshotPage,
   ApkToolsPage,
   QuickActionsPage,
-  BackupPage,
   SettingsPage,
   DevToolsPage,
 } from "./pages";
 import { useUiStore, useBinaryStore, useDeviceStore } from "./stores";
 
-const pageComponents = {
+const pageComponents: Record<string, () => JSX.Element> = {
   connect: ConnectPage,
   device: DevicePage,
   mirror: ScreenMirrorPage,
@@ -30,7 +29,6 @@ const pageComponents = {
   screenshot: ScreenshotPage,
   "apk-tools": ApkToolsPage,
   "quick-actions": QuickActionsPage,
-  backup: BackupPage,
   settings: SettingsPage,
   "dev-tools": DevToolsPage,
 };
@@ -45,7 +43,6 @@ const DEVICE_PAGES = [
   "screenshot",
   "apk-tools",
   "quick-actions",
-  "backup",
   "dev-tools",
 ];
 

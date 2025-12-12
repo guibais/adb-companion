@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "target": "ES2022",
     "composite": true,
     "skipLibCheck": true,
     "module": "ESNext",
@@ -10,5 +11,5 @@
     "outDir": "./dist-electron",
     "rootDir": "."
   },
-  "include": ["vite.config.ts", "electron/**/*.ts"]
+  "include": ["vite.config.ts", "electron/**/*.ts", "src/types/**/*.ts"]
 }

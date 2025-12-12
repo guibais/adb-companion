@@ -8,6 +8,5 @@ export { ShellPage } from "./ShellPage";
 export { ScreenshotPage } from "./ScreenshotPage";
 export { ApkToolsPage } from "./ApkToolsPage";
 export { QuickActionsPage } from "./QuickActionsPage";
-export { BackupPage } from "./BackupPage";
 export { SettingsPage } from "./SettingsPage";
 export { DevToolsPage } from "./DevToolsPage";

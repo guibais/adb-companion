@@ -6,7 +6,7 @@ import type {
   BatteryInfo,
   StorageInfo,
   SavedDevice,
-} from "../../src/types/device.types";
+} from "../../../src/types/device.types";
 import { AdbService } from "./adb.service";
 
 export class DeviceService {

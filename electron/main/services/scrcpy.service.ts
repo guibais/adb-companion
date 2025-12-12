@@ -2,7 +2,7 @@ import { spawn, ChildProcess } from "child_process";
 import { join } from "path";
 import { app } from "electron";
 import { existsSync } from "fs";
-import type { ScrcpyOptions } from "../../src/types/ipc.types";
+import type { ScrcpyOptions } from "../../../src/types/ipc.types";
 
 export class ScrcpyService {
   private scrcpyPath: string = "";

@@ -6,10 +6,10 @@ import type {
   Device,
   DeviceConnectionType,
   DeviceStatus,
-} from "../../src/types/device.types";
-import type { InstalledApp } from "../../src/types/app.types";
-import type { FileEntry, FileType } from "../../src/types/file.types";
-import type { LogcatEntry, LogLevel } from "../../src/types/ipc.types";
+} from "../../../src/types/device.types";
+import type { InstalledApp } from "../../../src/types/app.types";
+import type { FileEntry, FileType } from "../../../src/types/file.types";
+import type { LogcatEntry, LogLevel } from "../../../src/types/ipc.types";
 
 export class AdbService {
   private adbPath: string = "";
@@ -457,6 +457,15 @@ export class AdbService {
   ): void {
     this.logcatStop(deviceId);
 
+    const logLevelOrder: Record<LogLevel, number> = {
+      V: 0,
+      D: 1,
+      I: 2,
+      W: 3,
+      E: 4,
+      F: 5,
+    };
+
     const args = ["logcat", "-v", "threadtime"];
 
     if (filters?.tag) {
@@ -481,7 +490,12 @@ export class AdbService {
 
         const [, timestamp, pid, tid, level, tag, message] = match;
 
-        if (filters?.level && level < filters.level) continue;
+        if (
+          filters?.level &&
+          logLevelOrder[level as LogLevel] <
+            logLevelOrder[filters.level as LogLevel]
+        )
+          continue;
         if (
           filters?.search &&
           !message.toLowerCase().includes(filters.search.toLowerCase())

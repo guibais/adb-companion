@@ -7,7 +7,6 @@ import {
   Terminal,
   Camera,
   Zap,
-  HardDrive,
   Wrench,
   ChevronLeft,
   ChevronRight,
@@ -24,7 +23,6 @@ type Page =
   | "screenshot"
   | "apk-tools"
   | "quick-actions"
-  | "backup"
   | "dev-tools";
 
 type MenuItem = {
@@ -77,12 +75,6 @@ const MENU_ITEMS: MenuItem[] = [
     label: "Quick Actions",
     icon: Zap,
     description: "Device controls",
-  },
-  {
-    id: "backup",
-    label: "Backup",
-    icon: HardDrive,
-    description: "Backup & Restore",
   },
   {
     id: "apk-tools",

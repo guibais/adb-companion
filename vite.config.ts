@@ -10,6 +10,9 @@ export default defineConfig({
     electron([
       {
         entry: "electron/main/index.ts",
+        onstart(args) {
+          args.startup();
+        },
         vite: {
           build: {
             outDir: "dist-electron/main",
@@ -21,8 +24,8 @@ export default defineConfig({
       },
       {
         entry: "electron/preload/index.ts",
-        onstart(options) {
-          options.reload();
+        onstart(args) {
+          args.reload();
         },
         vite: {
           build: {

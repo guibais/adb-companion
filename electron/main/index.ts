@@ -49,6 +49,14 @@ async function createWindow() {
       sandbox: false,
     },
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+    titleBarOverlay:
+      process.platform === "win32" || process.platform === "linux"
+        ? {
+            color: "#0f0f0f",
+            symbolColor: "#d4d4d8",
+            height: 56,
+          }
+        : undefined,
     backgroundColor: "#0f0f0f",
     show: false,
   });

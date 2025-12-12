@@ -15,7 +15,7 @@ import type {
   BinaryStatus,
   BinaryInfo,
   DownloadProgress,
-} from "../../src/types/ipc.types";
+} from "../../../src/types/ipc.types";
 
 type BinaryConfig = {
   name: string;

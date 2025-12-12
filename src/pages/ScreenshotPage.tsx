@@ -1,12 +1,5 @@
 import { useState } from "react";
-import {
-  Camera,
-  Video,
-  Play,
-  Square,
-  FolderOpen,
-  Download,
-} from "lucide-react";
+import { Camera, Video, Play, Square, FolderOpen } from "lucide-react";
 import { Button, PageHeader } from "../components/ui";
 import { useDeviceStore, useUiStore } from "../stores";
 
@@ -73,9 +66,18 @@ export function ScreenshotPage() {
     }
   };
 
+  const toFileUrl = (path: string) => {
+    const normalized = path.replace(/\\/g, "/");
+    const withLeadingSlash = normalized.startsWith("/")
+      ? normalized
+      : `/${normalized}`;
+    return `file://${encodeURI(withLeadingSlash)}`;
+  };
+
   const openFolder = async (path: string) => {
     const folder = path.split("/").slice(0, -1).join("/");
-    await window.electronAPI["shell:open-external"](`file://${folder}`);
+    if (!folder) return;
+    await window.electronAPI["shell:open-external"](toFileUrl(folder));
   };
 
   if (!activeDevice) {
@@ -123,7 +125,7 @@ export function ScreenshotPage() {
             <div className="mt-4 space-y-3">
               <div className="rounded-lg overflow-hidden border border-border bg-black">
                 <img
-                  src={`file://${lastScreenshot}`}
+                  src={toFileUrl(lastScreenshot)}
                   alt="Screenshot"
                   className="w-full h-auto max-h-64 object-contain"
                 />

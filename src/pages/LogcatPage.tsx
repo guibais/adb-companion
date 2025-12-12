@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { FileText, Play, Square, Trash2, Download, Filter } from "lucide-react";
+import { Virtuoso } from "react-virtuoso";
 import { Button, Input, PageHeader } from "../components/ui";
 import { useDeviceStore, useUiStore } from "../stores";
 import type { LogcatEntry, LogLevel } from "../types";
@@ -11,6 +12,15 @@ const LOG_COLORS: Record<LogLevel, string> = {
   W: "text-yellow-400",
   E: "text-red-400",
   F: "text-red-600",
+};
+
+const LOG_LEVEL_ORDER: Record<LogLevel, number> = {
+  V: 0,
+  D: 1,
+  I: 2,
+  W: 3,
+  E: 4,
+  F: 5,
 };
 
 export function LogcatPage() {
@@ -25,19 +35,11 @@ export function LogcatPage() {
     level: "" as LogLevel | "",
   });
   const [autoScroll, setAutoScroll] = useState(true);
-  const logsEndRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const activeDevice = activeTab?.deviceId
     ? devices.find((d) => d.id === activeTab.deviceId)
     : null;
-
-  useEffect(() => {
-    if (autoScroll) {
-      logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [logs, autoScroll]);
 
   useEffect(() => {
     const unsubscribe = window.electronEvents["logcat:entry"]((entry) => {
@@ -100,7 +102,11 @@ export function LogcatPage() {
   };
 
   const filteredLogs = logs.filter((log) => {
-    if (filter.level && log.level < filter.level) return false;
+    if (
+      filter.level &&
+      LOG_LEVEL_ORDER[log.level] < LOG_LEVEL_ORDER[filter.level]
+    )
+      return false;
     if (filter.tag && !log.tag.toLowerCase().includes(filter.tag.toLowerCase()))
       return false;
     if (
@@ -185,35 +191,34 @@ export function LogcatPage() {
         </label>
       </div>
 
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-y-auto bg-bg-secondary border border-border rounded-lg font-mono text-xs"
-      >
-        {filteredLogs.map((log, idx) => (
-          <div
-            key={idx}
-            className="px-3 py-1 hover:bg-bg-tertiary border-b border-border flex items-start gap-2"
-          >
-            <span className="text-zinc-600 w-24 flex-shrink-0">
-              {log.timestamp.split(" ")[1]}
-            </span>
-            <span className="text-zinc-500 w-16 flex-shrink-0">
-              {log.pid}/{log.tid}
-            </span>
-            <span
-              className={`w-4 flex-shrink-0 font-bold ${LOG_COLORS[log.level]}`}
-            >
-              {log.level}
-            </span>
-            <span className="text-purple-400 w-32 flex-shrink-0 truncate">
-              {log.tag}
-            </span>
-            <span className="text-zinc-300 flex-1 break-all">
-              {log.message}
-            </span>
-          </div>
-        ))}
-        <div ref={logsEndRef} />
+      <div className="flex-1 overflow-y-auto bg-bg-secondary border border-border rounded-lg font-mono text-xs">
+        <Virtuoso
+          data={filteredLogs}
+          followOutput={autoScroll ? "smooth" : false}
+          itemContent={(_, log) => (
+            <div className="px-3 py-1 hover:bg-bg-tertiary border-b border-border flex items-start gap-2">
+              <span className="text-zinc-600 w-24 flex-shrink-0">
+                {log.timestamp.split(" ")[1]}
+              </span>
+              <span className="text-zinc-500 w-16 flex-shrink-0">
+                {log.pid}/{log.tid}
+              </span>
+              <span
+                className={`w-4 flex-shrink-0 font-bold ${
+                  LOG_COLORS[log.level]
+                }`}
+              >
+                {log.level}
+              </span>
+              <span className="text-purple-400 w-32 flex-shrink-0 truncate">
+                {log.tag}
+              </span>
+              <span className="text-zinc-300 flex-1 break-all">
+                {log.message}
+              </span>
+            </div>
+          )}
+        />
 
         {logs.length === 0 && (
           <div className="text-center py-12">

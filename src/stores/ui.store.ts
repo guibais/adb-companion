@@ -12,7 +12,6 @@ type Page =
   | "screenshot"
   | "apk-tools"
   | "quick-actions"
-  | "backup"
   | "settings"
   | "dev-tools";
 

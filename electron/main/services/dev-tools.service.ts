@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   createWriteStream,
+  createReadStream,
   chmodSync,
   unlinkSync,
   readdirSync,
@@ -11,6 +12,10 @@ import {
 import https from "https";
 import http from "http";
 import { spawn, ChildProcess } from "child_process";
+
+const unzipper = require("unzipper") as unknown as {
+  Extract: (options: { path: string }) => NodeJS.WritableStream;
+};
 
 type DevToolConfig = {
   id: string;
@@ -47,6 +52,63 @@ const DEV_TOOLS: DevToolConfig[] = [
         : "Reactotron-3.6.2.AppImage",
     extractPath: "reactotron",
   },
+  {
+    id: "flipper",
+    name: "Flipper",
+    description: "Meta's extensible mobile debugger with a desktop runtime",
+    version: "0.273.0",
+    urls: {
+      darwin_arm64:
+        "https://github.com/facebook/flipper/releases/download/v0.273.0/Flipper-server-mac-aarch64.dmg",
+      darwin_x64:
+        "https://github.com/facebook/flipper/releases/download/v0.273.0/Flipper-server-mac-x64.dmg",
+    },
+    executable: "Flipper.app",
+    extractPath: "flipper",
+  },
+  {
+    id: "jadx",
+    name: "JADX GUI",
+    description: "Dex to Java decompiler with a GUI (APK analysis)",
+    version: "1.5.3",
+    urls: {
+      darwin:
+        "https://github.com/skylot/jadx/releases/download/v1.5.3/jadx-1.5.3.zip",
+      linux:
+        "https://github.com/skylot/jadx/releases/download/v1.5.3/jadx-1.5.3.zip",
+      win32:
+        "https://github.com/skylot/jadx/releases/download/v1.5.3/jadx-gui-1.5.3-with-jre-win.zip",
+    },
+    executable: process.platform === "win32" ? "jadx-gui.exe" : "bin/jadx-gui",
+    extractPath: "jadx",
+  },
+  {
+    id: "http-toolkit",
+    name: "HTTP Toolkit",
+    description: "Intercept & debug HTTP(S) traffic with a desktop UI",
+    version: "1.24.1",
+    urls: {
+      darwin_arm64:
+        "https://github.com/httptoolkit/httptoolkit-desktop/releases/download/v1.24.1/HttpToolkit-1.24.1-arm64.dmg",
+      darwin_x64:
+        "https://github.com/httptoolkit/httptoolkit-desktop/releases/download/v1.24.1/HttpToolkit-1.24.1-x64.dmg",
+      win32_x64:
+        "https://github.com/httptoolkit/httptoolkit-desktop/releases/download/v1.24.1/HttpToolkit-1.24.1-win-x64.zip",
+      linux_x64:
+        "https://github.com/httptoolkit/httptoolkit-desktop/releases/download/v1.24.1/HttpToolkit-1.24.1-x64.AppImage",
+      linux_arm64:
+        "https://github.com/httptoolkit/httptoolkit-desktop/releases/download/v1.24.1/HttpToolkit-1.24.1-arm64.AppImage",
+    },
+    executable:
+      process.platform === "darwin"
+        ? "HTTP Toolkit.app"
+        : process.platform === "win32"
+        ? "HTTP Toolkit.exe"
+        : process.arch === "arm64"
+        ? "HttpToolkit-1.24.1-arm64.AppImage"
+        : "HttpToolkit-1.24.1-x64.AppImage",
+    extractPath: "http-toolkit",
+  },
 ];
 
 export type DevToolInfo = {
@@ -82,6 +144,25 @@ export class DevToolsService {
     }
   }
 
+  private async extractZip(zipPath: string, destPath: string): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      const stream = unzipper.Extract({ path: destPath });
+
+      stream.on("close", () => resolve());
+      stream.on("error", (err: unknown) => reject(err));
+
+      createReadStream(zipPath).pipe(stream);
+    });
+  }
+
+  private ensureExecutablePermissions(path: string) {
+    if (process.platform === "win32") return;
+    if (path.endsWith(".app")) return;
+    try {
+      chmodSync(path, 0o755);
+    } catch {}
+  }
+
   setProgressCallback(callback: (progress: DevToolDownloadProgress) => void) {
     this.progressCallback = callback;
   }
@@ -97,35 +178,39 @@ export class DevToolsService {
     const platform = process.platform;
     const arch = process.arch;
 
-    if (platform === "darwin") {
-      if (tool.urls[`darwin_${arch}`]) return tool.urls[`darwin_${arch}`];
-      if (tool.urls["darwin"]) return tool.urls["darwin"];
-    }
+    const platformArchKey = `${platform}_${arch}`;
 
-    return tool.urls[platform] || "";
+    if (tool.urls[platformArchKey]) return tool.urls[platformArchKey];
+    if (platform === "darwin" && tool.urls[`darwin_${arch}`])
+      return tool.urls[`darwin_${arch}`];
+    if (tool.urls[platform]) return tool.urls[platform];
+
+    return "";
   }
 
   async checkTools(): Promise<DevToolInfo[]> {
     await this.initialize();
 
-    return DEV_TOOLS.map((tool) => {
+    return DEV_TOOLS.reduce<DevToolInfo[]>((acc, tool) => {
       const toolPath = join(this.toolsPath, tool.extractPath);
-      const execPath = join(toolPath, tool.executable);
-      const isInstalled =
-        existsSync(toolPath) && this.findExecutable(toolPath, tool) !== null;
+      const installedPath = this.findExecutable(toolPath, tool) || undefined;
+      const isInstalled = Boolean(installedPath);
 
-      return {
+      const isAvailable = this.getDownloadUrl(tool) !== "";
+      if (!isAvailable && !isInstalled) return acc;
+
+      acc.push({
         id: tool.id,
         name: tool.name,
         description: tool.description,
         version: tool.version,
         isInstalled,
         isRunning: this.runningProcesses.has(tool.id),
-        path: isInstalled
-          ? this.findExecutable(toolPath, tool) || undefined
-          : undefined,
-      };
-    });
+        ...(installedPath ? { path: installedPath } : {}),
+      });
+
+      return acc;
+    }, []);
   }
 
   private findExecutable(basePath: string, tool: DevToolConfig): string | null {
@@ -212,6 +297,17 @@ export class DevToolsService {
         try {
           unlinkSync(tempFile);
         } catch {}
+      } else if (fileName.endsWith(".zip")) {
+        await this.extractZip(tempFile, toolPath);
+
+        const extractedExecPath = this.findExecutable(toolPath, tool);
+        if (extractedExecPath) {
+          this.ensureExecutablePermissions(extractedExecPath);
+        }
+
+        try {
+          unlinkSync(tempFile);
+        } catch {}
       } else if (
         process.platform === "linux" &&
         fileName.endsWith(".AppImage")
@@ -247,6 +343,7 @@ export class DevToolsService {
     if (process.platform === "darwin" && tool.path.endsWith(".app")) {
       proc = spawn("open", ["-a", tool.path], { detached: true });
     } else {
+      this.ensureExecutablePermissions(tool.path);
       proc = spawn(tool.path, [], { detached: true });
     }
 
