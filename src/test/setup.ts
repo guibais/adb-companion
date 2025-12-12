@@ -24,6 +24,24 @@ beforeAll(() => {
 
   const noopUnsub = () => {};
 
+  Object.defineProperty(navigator, "clipboard", {
+    value: {
+      writeText: async () => undefined,
+    },
+    configurable: true,
+  });
+
+  if (!URL.createObjectURL) {
+    (URL as any).createObjectURL = () => "blob:test";
+  }
+  if (!URL.revokeObjectURL) {
+    (URL as any).revokeObjectURL = () => undefined;
+  }
+
+  if (!HTMLElement.prototype.scrollTo) {
+    HTMLElement.prototype.scrollTo = () => undefined;
+  }
+
   const electronAPI: any = {
     "adb:list-devices": async () => [],
     "adb:connect": async () => true,
@@ -126,8 +144,8 @@ beforeAll(() => {
     "devtools:progress": () => noopUnsub,
   };
 
-  window.electronAPI = electronAPI;
-  window.electronEvents = electronEvents;
+  (window as any).electronAPI = electronAPI;
+  (window as any).electronEvents = electronEvents;
 });
 
 afterEach(() => {
