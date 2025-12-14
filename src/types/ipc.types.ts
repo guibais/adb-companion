@@ -194,6 +194,10 @@ export type IpcApi = {
     defaultName: string,
     filters?: { name: string; extensions: string[] }[]
   ) => Promise<string | null>;
+  "shell:write-temp-file": (
+    fileName: string,
+    bytes: number[]
+  ) => Promise<string>;
 
   "app:get-version": () => Promise<string>;
   "app:get-platform": () => Promise<NodeJS.Platform>;

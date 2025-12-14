@@ -53,7 +53,7 @@ export class ScrcpyService {
     if (options?.borderless) scrcpyArgs.push("--window-borderless");
     if (options?.alwaysOnTop) scrcpyArgs.push("--always-on-top");
     if (options?.windowTitle)
-      scrcpyArgs.push(`--window-title="${options.windowTitle}"`);
+      scrcpyArgs.push("--window-title", options.windowTitle);
     if (options?.rotation !== undefined)
       scrcpyArgs.push("--rotation", String(options.rotation));
     if (options?.crop) scrcpyArgs.push("--crop", options.crop);

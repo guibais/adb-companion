@@ -2,7 +2,6 @@ import {
   Smartphone,
   Monitor,
   Package,
-  FolderOpen,
   FileText,
   Terminal,
   Camera,
@@ -18,7 +17,6 @@ type Page =
   | "device"
   | "mirror"
   | "apps"
-  | "files"
   | "logcat"
   | "shell"
   | "screenshot"
@@ -51,12 +49,6 @@ const MENU_ITEMS: MenuItem[] = [
     label: "Applications",
     icon: Package,
     description: "Manage apps",
-  },
-  {
-    id: "files",
-    label: "File Manager",
-    icon: FolderOpen,
-    description: "Browse files",
   },
   { id: "logcat", label: "Logcat", icon: FileText, description: "View logs" },
   {

@@ -92,6 +92,8 @@ const api: IpcApi = {
     ipcRenderer.invoke("shell:select-file", options),
   "shell:select-save-path": (defaultName, filters) =>
     ipcRenderer.invoke("shell:select-save-path", defaultName, filters),
+  "shell:write-temp-file": (fileName, bytes) =>
+    ipcRenderer.invoke("shell:write-temp-file", fileName, bytes),
 
   "app:get-version": () => ipcRenderer.invoke("app:get-version"),
   "app:get-platform": () => ipcRenderer.invoke("app:get-platform"),

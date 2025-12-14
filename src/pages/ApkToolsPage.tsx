@@ -1,12 +1,39 @@
 import { useState } from "react";
-import { Upload, Package, Copy, Edit3 } from "lucide-react";
+import {
+  Upload,
+  Package,
+  Copy,
+  Edit3,
+  Loader2,
+  Smartphone,
+} from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import type { FileWithPath } from "react-dropzone";
-import { Button, Input, ProgressBar, PageHeader } from "../components/ui";
-import { useUiStore } from "../stores";
+import {
+  Button,
+  Input,
+  Modal,
+  ProgressBar,
+  PageHeader,
+} from "../components/ui";
+import { useDeviceStore, useUiStore } from "../stores";
 import type { ApkInfo } from "../types";
 
+type ApkAction = "install" | "clone";
+
+type ApkActionProgress = {
+  step: number;
+  total: number;
+  message: string;
+};
+
+type ApkActionError = {
+  title: string;
+  message: string;
+};
+
 export function ApkToolsPage() {
+  const { devices, tabs, activeTabId } = useDeviceStore();
   const { addToast } = useUiStore();
 
   const [selectedApk, setSelectedApk] = useState<string | null>(null);
@@ -16,6 +43,21 @@ export function ApkToolsPage() {
   const [newAppName, setNewAppName] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
 
+  const [selectedAction, setSelectedAction] = useState<ApkAction>("install");
+  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+  const [isExecutingAction, setIsExecutingAction] = useState(false);
+  const [actionProgress, setActionProgress] = useState<ApkActionProgress>({
+    step: 0,
+    total: 3,
+    message: "",
+  });
+  const [actionError, setActionError] = useState<ApkActionError | null>(null);
+
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  const activeDevice = activeTab?.deviceId
+    ? devices.find((d) => d.id === activeTab.deviceId)
+    : null;
+
   const onDrop = async (acceptedFiles: FileWithPath[]) => {
     const apkFile = acceptedFiles.find((f) => f.name.endsWith(".apk"));
     if (!apkFile) {
@@ -23,19 +65,40 @@ export function ApkToolsPage() {
       return;
     }
 
-    if (!apkFile.path) {
-      addToast({ type: "error", title: "Failed to read APK" });
-      return;
+    let apkPath = apkFile.path || "";
+    const isAbsolutePath =
+      apkPath.startsWith("/") || /^[a-zA-Z]:\\/.test(apkPath);
+
+    if (!isAbsolutePath) {
+      try {
+        const buffer = await (apkFile as unknown as File).arrayBuffer();
+        const bytes = Array.from(new Uint8Array(buffer));
+        apkPath = await window.electronAPI["shell:write-temp-file"](
+          apkFile.name || "app.apk",
+          bytes
+        );
+      } catch (err) {
+        addToast({
+          type: "error",
+          title: "Failed to read APK",
+          message: err instanceof Error ? err.message : "Unknown error",
+        });
+        return;
+      }
     }
 
-    setSelectedApk(apkFile.path);
+    setSelectedApk(apkPath);
+    setApkInfo(null);
     setIsLoading(true);
 
     try {
-      const info = await window.electronAPI["apk:get-info"](apkFile.path);
+      const info = await window.electronAPI["apk:get-info"](apkPath);
       setApkInfo(info);
       setNewPackageName(info.packageName + ".clone");
       setNewAppName(info.appName + " Clone");
+      setSelectedAction("install");
+      setActionError(null);
+      setIsActionModalOpen(true);
     } catch (err) {
       addToast({
         type: "error",
@@ -68,30 +131,109 @@ export function ApkToolsPage() {
     }
   };
 
-  const handleRenamePackage = async () => {
-    if (!selectedApk || !newPackageName) return;
+  const closeActionModal = () => {
+    if (isExecutingAction) return;
+    setIsActionModalOpen(false);
+    setActionError(null);
+  };
 
-    setIsRenaming(true);
+  const setProgress = (progress: ApkActionProgress) => {
+    setActionProgress(progress);
+  };
+
+  const resetProgress = () => {
+    setActionProgress({ step: 0, total: 3, message: "" });
+  };
+
+  const sanitizeErrorMessage = (raw: string) => {
+    const lines = raw
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+
+    const filtered = lines.filter(
+      (l) =>
+        !l.startsWith("at ") &&
+        !l.includes("node:internal") &&
+        !l.includes("<anonymous>")
+    );
+
+    return filtered.slice(0, 10).join("\n");
+  };
+
+  const runInstallOnly = async () => {
+    setSelectedAction("install");
+    setActionError(null);
+    await executeSelectedAction();
+  };
+
+  const executeSelectedAction = async () => {
+    if (!activeDevice) {
+      addToast({ type: "warning", title: "No device selected" });
+      return;
+    }
+    if (!selectedApk) return;
+
+    setActionError(null);
+
+    if (selectedAction === "clone" && !newPackageName.trim()) {
+      addToast({ type: "warning", title: "New package name is required" });
+      return;
+    }
+
+    setIsExecutingAction(true);
+    setIsRenaming(selectedAction === "clone");
+
     try {
-      const outputPath = await window.electronAPI["apk:rename-package"]({
+      if (selectedAction === "install") {
+        setProgress({ step: 1, total: 2, message: "Installing APK..." });
+        await window.electronAPI["adb:install-apk"](
+          activeDevice.id,
+          selectedApk
+        );
+        setProgress({ step: 2, total: 2, message: "Done!" });
+        addToast({ type: "success", title: "APK installed" });
+        setIsActionModalOpen(false);
+        return;
+      }
+
+      setProgress({ step: 1, total: 3, message: "Modifying & signing APK..." });
+      const modifiedApkPath = await window.electronAPI["apk:rename-package"]({
         apkPath: selectedApk,
-        newPackageName,
-        newAppName: newAppName || undefined,
+        newPackageName: newPackageName.trim(),
+        newAppName: newAppName.trim() || undefined,
       });
 
-      addToast({
-        type: "success",
-        title: "APK modified successfully",
-        message: outputPath,
-      });
+      setProgress({ step: 2, total: 3, message: "Installing modified APK..." });
+      await window.electronAPI["adb:install-apk"](
+        activeDevice.id,
+        modifiedApkPath
+      );
+
+      setProgress({ step: 3, total: 3, message: "Done!" });
+      addToast({ type: "success", title: "Modified APK installed" });
+      setIsActionModalOpen(false);
     } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      const shortMsg = sanitizeErrorMessage(raw);
+
+      setActionError({
+        title: selectedAction === "clone" ? "Clone failed" : "Install failed",
+        message: shortMsg,
+      });
+
       addToast({
         type: "error",
-        title: "Failed to modify APK",
-        message: String(err),
+        title: "Operation failed",
+        message:
+          selectedAction === "clone"
+            ? "Could not rebuild APK after modification"
+            : "Install failed",
       });
     } finally {
+      setIsExecutingAction(false);
       setIsRenaming(false);
+      resetProgress();
     }
   };
 
@@ -101,6 +243,20 @@ export function ApkToolsPage() {
         title="APK Tools"
         description="Clone, rename, and modify APK packages"
       />
+
+      {!activeDevice && (
+        <div className="flex items-center justify-center">
+          <div className="text-center py-10">
+            <Smartphone className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+            <h2 className="text-lg font-medium text-white mb-2">
+              No Device Selected
+            </h2>
+            <p className="text-sm text-zinc-500">
+              Connect a device to install APKs
+            </p>
+          </div>
+        </div>
+      )}
 
       <div
         {...getRootProps()}
@@ -172,38 +328,25 @@ export function ApkToolsPage() {
           </div>
 
           <div className="bg-bg-secondary border border-border rounded-xl p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-purple-500/10 rounded-lg">
-                <Copy className="w-6 h-6 text-purple-500" />
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-500/10 rounded-lg">
+                  <Copy className="w-6 h-6 text-purple-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-medium text-white">Next step</h2>
+                  <p className="text-sm text-zinc-500">
+                    Choose what you want to do with this APK
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-lg font-medium text-white">Clone APK</h2>
-                <p className="text-sm text-zinc-500">
-                  Create a modified copy with a new package name
-                </p>
-              </div>
-            </div>
 
-            <div className="space-y-4">
-              <Input
-                label="New Package Name"
-                value={newPackageName}
-                onChange={(e) => setNewPackageName(e.target.value)}
-                placeholder="com.example.app.clone"
-              />
-              <Input
-                label="New App Name (optional)"
-                value={newAppName}
-                onChange={(e) => setNewAppName(e.target.value)}
-                placeholder="App Name Clone"
-              />
               <Button
-                onClick={handleRenamePackage}
-                loading={isRenaming}
-                className="w-full"
+                variant="secondary"
+                onClick={() => setIsActionModalOpen(true)}
+                disabled={!activeDevice}
               >
-                <Edit3 className="w-4 h-4" />
-                Create Modified APK
+                Choose Action
               </Button>
             </div>
           </div>
@@ -227,6 +370,123 @@ export function ApkToolsPage() {
           )}
         </>
       )}
+
+      <Modal
+        isOpen={isActionModalOpen}
+        onClose={closeActionModal}
+        title="What do you want to do?"
+        size="lg"
+      >
+        <div className="space-y-4">
+          {actionError && !isExecutingAction && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+              <p className="text-sm font-medium text-red-400 mb-2">
+                {actionError.title}
+              </p>
+              <pre className="text-xs text-zinc-300 whitespace-pre-wrap break-words">
+                {actionError.message}
+              </pre>
+
+              {selectedAction === "clone" && (
+                <div className="flex justify-end gap-2 mt-3">
+                  <Button variant="ghost" onClick={() => setActionError(null)}>
+                    Dismiss
+                  </Button>
+                  <Button onClick={runInstallOnly} disabled={!activeDevice}>
+                    Try install only
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {isExecutingAction ? (
+            <div className="py-2">
+              <div className="flex items-center gap-3 mb-4">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                <span className="text-sm text-zinc-300">
+                  {actionProgress.message}
+                </span>
+              </div>
+              <ProgressBar
+                value={actionProgress.step}
+                max={Math.max(actionProgress.total, 1)}
+                showLabel
+              />
+              <p className="text-xs text-zinc-500 mt-2 text-center">
+                Step {actionProgress.step} of {actionProgress.total}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button
+                  onClick={() => setSelectedAction("install")}
+                  className={`p-4 rounded-lg border text-left transition-colors ${
+                    selectedAction === "install"
+                      ? "border-accent bg-accent/10"
+                      : "border-border bg-bg-tertiary hover:border-accent/50"
+                  }`}
+                >
+                  <h3 className="text-sm font-medium text-white mb-1">
+                    Install only
+                  </h3>
+                  <p className="text-xs text-zinc-500">
+                    Install this APK on the selected device
+                  </p>
+                </button>
+
+                <button
+                  onClick={() => setSelectedAction("clone")}
+                  className={`p-4 rounded-lg border text-left transition-colors ${
+                    selectedAction === "clone"
+                      ? "border-accent bg-accent/10"
+                      : "border-border bg-bg-tertiary hover:border-accent/50"
+                  }`}
+                >
+                  <h3 className="text-sm font-medium text-white mb-1">
+                    Clone / modify
+                  </h3>
+                  <p className="text-xs text-zinc-500">
+                    Change package name and optional app name, then install
+                  </p>
+                </button>
+              </div>
+
+              {selectedAction === "clone" && (
+                <div className="space-y-3">
+                  <Input
+                    label="New Package Name"
+                    value={newPackageName}
+                    onChange={(e) => setNewPackageName(e.target.value)}
+                    placeholder="com.example.app.clone"
+                  />
+                  <Input
+                    label="New App Name (optional)"
+                    value={newAppName}
+                    onChange={(e) => setNewAppName(e.target.value)}
+                    placeholder="App Name Clone"
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="ghost" onClick={closeActionModal}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={executeSelectedAction}
+                  disabled={!activeDevice || !selectedApk}
+                  loading={isRenaming}
+                >
+                  <Edit3 className="w-4 h-4" />
+                  Run
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
 
       <div className="bg-bg-secondary border border-border rounded-xl p-4">
         <h3 className="text-sm font-medium text-white mb-3">

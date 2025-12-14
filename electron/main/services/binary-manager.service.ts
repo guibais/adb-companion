@@ -1,4 +1,5 @@
 import { app, BrowserWindow } from "electron";
+import { execFileSync } from "child_process";
 import { join } from "path";
 import {
   existsSync,
@@ -93,6 +94,25 @@ export class BinaryManagerService {
   private binariesPath: string = "";
   private initialized: boolean = false;
   private mainWindow: BrowserWindow | null = null;
+
+  private ensureExecutablePermission(path: string) {
+    if (!path) return;
+    if (!existsSync(path)) return;
+    try {
+      chmodSync(path, 0o755);
+    } catch {}
+  }
+
+  private tryRemoveQuarantine(targetPath: string) {
+    if (process.platform !== "darwin") return;
+    if (!targetPath) return;
+
+    try {
+      execFileSync("xattr", ["-dr", "com.apple.quarantine", targetPath], {
+        stdio: "ignore",
+      });
+    } catch {}
+  }
 
   setMainWindow(window: BrowserWindow) {
     this.mainWindow = window;
@@ -324,10 +344,17 @@ export class BinaryManagerService {
           await this.extractTarGz(tempFile, extractDir);
         }
 
+        this.tryRemoveQuarantine(extractDir);
+
         if (process.platform !== "win32" && config.executable) {
           const execPath = this.getBinaryPath(name);
-          if (existsSync(execPath)) {
-            chmodSync(execPath, 0o755);
+          this.ensureExecutablePermission(execPath);
+
+          if (name === "platform-tools") {
+            this.ensureExecutablePermission(join(extractDir, "adb"));
+            this.ensureExecutablePermission(
+              join(extractDir, "platform-tools", "adb")
+            );
           }
         }
 

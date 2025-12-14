@@ -1,4 +1,6 @@
 import { ipcMain, dialog, shell, app } from "electron";
+import { join } from "path";
+import { mkdirSync, writeFileSync } from "fs";
 import type { AdbService } from "./services/adb.service";
 import type { ScrcpyService } from "./services/scrcpy.service";
 import type { BinaryManagerService } from "./services/binary-manager.service";
@@ -241,6 +243,18 @@ export function registerIpcHandlers(services: Services) {
         filters,
       });
       return result.canceled ? null : result.filePath;
+    }
+  );
+
+  ipcMain.handle(
+    "shell:write-temp-file",
+    async (_, fileName: string, bytes: number[]) => {
+      const dir = join(app.getPath("temp"), "adb-companion", "uploads");
+      mkdirSync(dir, { recursive: true });
+      const safeName = `${Date.now()}-${fileName}`;
+      const filePath = join(dir, safeName);
+      writeFileSync(filePath, Buffer.from(bytes));
+      return filePath;
     }
   );
 

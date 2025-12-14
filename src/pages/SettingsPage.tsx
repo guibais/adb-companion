@@ -1,14 +1,110 @@
 import { Github, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Input } from "../components/ui";
 import { useSettingsStore, useBinaryStore, useUiStore } from "../stores";
+import type { DownloadProgress } from "../types";
+
+type ToolKey =
+  | "platform-tools"
+  | "scrcpy"
+  | "java"
+  | "apktool"
+  | "uber-apk-signer";
 
 export function SettingsPage() {
   const settings = useSettingsStore();
-  const { status } = useBinaryStore();
+  const { status, setStatus, setChecking } = useBinaryStore();
   const { addToast } = useUiStore();
+  const [downloadingTool, setDownloadingTool] = useState<ToolKey | null>(null);
+  const [progressMap, setProgressMap] = useState<Map<string, DownloadProgress>>(
+    new Map()
+  );
 
   const handleCheckUpdates = async () => {
     addToast({ type: "info", title: "Checking for updates..." });
+  };
+
+  const tools = useMemo(
+    () => [
+      {
+        key: "platform-tools" as const,
+        label: "Platform Tools",
+        info: status?.platformTools,
+      },
+      { key: "scrcpy" as const, label: "scrcpy", info: status?.scrcpy },
+      {
+        key: "java" as const,
+        label: "Java Runtime",
+        info: status?.java,
+      },
+      {
+        key: "apktool" as const,
+        label: "APK Tool",
+        info: status?.apktool,
+      },
+      {
+        key: "uber-apk-signer" as const,
+        label: "APK Signer",
+        info: status?.uberApkSigner,
+      },
+    ],
+    [status]
+  );
+
+  const refreshBinaryStatus = async () => {
+    setChecking(true);
+    try {
+      const nextStatus = await window.electronAPI["binary:check"]();
+      setStatus(nextStatus);
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  useEffect(() => {
+    const unsubscribe = window.electronEvents?.["download:progress"]?.(
+      (progress: DownloadProgress) => {
+        setProgressMap((prev) => {
+          const next = new Map(prev);
+          next.set(progress.name, progress);
+          return next;
+        });
+
+        if (progress.status === "completed") {
+          setTimeout(() => {
+            refreshBinaryStatus();
+          }, 300);
+        }
+      }
+    );
+
+    return () => unsubscribe?.();
+  }, []);
+
+  const formatBytes = (bytes: number): string => {
+    if (!bytes || bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  };
+
+  const handleDownloadAgain = async (tool: ToolKey) => {
+    setDownloadingTool(tool);
+    addToast({ type: "info", title: "Downloading tool..." });
+    try {
+      await window.electronAPI["binary:download"](tool);
+      await refreshBinaryStatus();
+      addToast({ type: "success", title: "Tool downloaded" });
+    } catch (err) {
+      addToast({
+        type: "error",
+        title: "Download failed",
+        message: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setDownloadingTool(null);
+    }
   };
 
   return (
@@ -100,18 +196,85 @@ export function SettingsPage() {
       <div className="bg-bg-secondary border border-border rounded-xl p-6">
         <h2 className="text-lg font-medium text-white mb-4">Installed Tools</h2>
         <div className="space-y-3">
-          {[
-            { name: "Platform Tools", info: status?.platformTools },
-            { name: "scrcpy", info: status?.scrcpy },
-            { name: "Java Runtime", info: status?.java },
-            { name: "APK Tool", info: status?.apktool },
-            { name: "APK Signer", info: status?.uberApkSigner },
-          ].map(({ name, info }) => (
+          {tools.map(({ key, label, info }) => (
             <div
-              key={name}
+              key={key}
               className="flex items-center justify-between py-2 border-b border-border last:border-0"
             >
-              <span className="text-sm text-zinc-300">{name}</span>
+              <div className="flex-1 min-w-0 pr-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-zinc-300">{label}</span>
+                  <div className="flex items-center gap-2">
+                    {info?.isInstalled ? (
+                      <>
+                        <span className="text-xs text-zinc-500">
+                          v{info.version}
+                        </span>
+                        <span className="w-2 h-2 bg-green-500 rounded-full" />
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xs text-zinc-500">
+                          Not installed
+                        </span>
+                        <span className="w-2 h-2 bg-red-500 rounded-full" />
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {(() => {
+                  const progress = progressMap.get(key);
+                  if (!progress) return null;
+
+                  const isActive =
+                    progress.status === "downloading" ||
+                    progress.status === "extracting";
+
+                  if (!isActive && progress.status !== "failed") return null;
+
+                  return (
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between text-xs text-zinc-500 mb-1">
+                        <span>
+                          {progress.status === "extracting"
+                            ? "Extracting..."
+                            : progress.status === "failed"
+                            ? "Failed"
+                            : "Downloading..."}
+                        </span>
+                        {progress.status !== "failed" && (
+                          <span>
+                            {formatBytes(progress.downloadedBytes)} /{" "}
+                            {formatBytes(progress.totalBytes)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <div className="w-full">
+                            <div className="w-full bg-bg-tertiary rounded-full overflow-hidden h-2">
+                              <div
+                                className="h-full bg-gradient-to-r from-accent to-green-400 rounded-full transition-all duration-300"
+                                style={{ width: `${progress.percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-xs text-zinc-500 w-10 text-right">
+                          {Math.round(progress.percentage)}%
+                        </span>
+                      </div>
+                      {progress.status === "failed" && progress.error && (
+                        <p className="text-xs text-red-400 mt-2">
+                          {progress.error}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
               <div className="flex items-center gap-2">
                 {info?.isInstalled ? (
                   <>
@@ -126,6 +289,14 @@ export function SettingsPage() {
                     <span className="w-2 h-2 bg-red-500 rounded-full" />
                   </>
                 )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  loading={downloadingTool === key}
+                  onClick={() => handleDownloadAgain(key)}
+                >
+                  Download again
+                </Button>
               </div>
             </div>
           ))}

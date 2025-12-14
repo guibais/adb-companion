@@ -11,6 +11,105 @@ import {
 import type { ApkInfo, ApkRenameOptions } from "../../../src/types/app.types";
 
 export class ApkToolsService {
+  private sanitizeToolOutput(raw: string): string {
+    const lines = raw
+      .split("\n")
+      .map((l) => l.trimEnd())
+      .filter((l) => l.trim().length > 0);
+
+    const cleaned = lines
+      .map((l) =>
+        l
+          .replace(/\/var\/folders\/[^\s]+/g, "<tmp>")
+          .replace(/\/tmp\/[^\s]+/g, "<tmp>")
+      )
+      .filter((l) => !l.includes("brut_util_Jar"));
+
+    const unique: string[] = [];
+    for (const l of cleaned) {
+      if (unique.includes(l)) continue;
+      unique.push(l);
+      if (unique.length >= 25) break;
+    }
+
+    return unique.join("\n");
+  }
+
+  private async decodeApk(apkPath: string, outputDir: string): Promise<void> {
+    try {
+      await this.exec([
+        "-jar",
+        this.getApktoolPath(),
+        "d",
+        apkPath,
+        "-o",
+        outputDir,
+        "-f",
+        "--use-aapt2",
+      ]);
+      return;
+    } catch {}
+
+    await this.exec([
+      "-jar",
+      this.getApktoolPath(),
+      "d",
+      apkPath,
+      "-o",
+      outputDir,
+      "-f",
+    ]);
+  }
+
+  private async buildApk(outputDir: string, outApk: string): Promise<void> {
+    const attempts: Array<{ args: string[]; isAapt2: boolean }> = [
+      {
+        args: [
+          "-jar",
+          this.getApktoolPath(),
+          "b",
+          outputDir,
+          "-o",
+          outApk,
+          "--use-aapt2",
+        ],
+        isAapt2: true,
+      },
+      {
+        args: ["-jar", this.getApktoolPath(), "b", outputDir, "-o", outApk],
+        isAapt2: false,
+      },
+    ];
+
+    const errorsByAttempt: Record<string, string> = {};
+    let lastErr: unknown = null;
+    for (const attempt of attempts) {
+      try {
+        await this.exec(attempt.args);
+        return;
+      } catch (err) {
+        lastErr = err;
+        const key = attempt.isAapt2 ? "aapt2" : "legacy";
+        const raw = err instanceof Error ? err.message : String(err);
+        errorsByAttempt[key] = this.sanitizeToolOutput(raw);
+      }
+    }
+
+    const raw = lastErr instanceof Error ? lastErr.message : String(lastErr);
+
+    const aapt2Msg = errorsByAttempt.aapt2
+      ? `aapt2 attempt:\n${errorsByAttempt.aapt2}`
+      : "aapt2 attempt: (no output)";
+    const legacyMsg = errorsByAttempt.legacy
+      ? `legacy attempt:\n${errorsByAttempt.legacy}`
+      : "legacy attempt: (no output)";
+
+    const fallbackMsg = this.sanitizeToolOutput(raw);
+    throw new Error(
+      `${aapt2Msg}\n\n${legacyMsg}\n\n${fallbackMsg}\n\nThis APK could not be rebuilt after modification. Try Install only. If you want cloning to work, update apktool/aapt2 or use a different APK build (some apps are protected).`
+    );
+  }
+
   private replacePackageInManifest(
     manifest: string,
     oldPackage: string,
@@ -280,15 +379,7 @@ export class ApkToolsService {
     if (!existsSync(tempDir)) mkdirSync(tempDir, { recursive: true });
     if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true });
 
-    await this.exec([
-      "-jar",
-      this.getApktoolPath(),
-      "d",
-      apkPath,
-      "-o",
-      outputDir,
-      "-f",
-    ]);
+    await this.decodeApk(apkPath, outputDir);
 
     const manifestPath = join(outputDir, "AndroidManifest.xml");
     let oldPackage = "";
@@ -328,14 +419,7 @@ export class ApkToolsService {
       }
     }
 
-    await this.exec([
-      "-jar",
-      this.getApktoolPath(),
-      "b",
-      outputDir,
-      "-o",
-      modifiedApk,
-    ]);
+    await this.buildApk(outputDir, modifiedApk);
 
     await this.exec([
       "-jar",
@@ -388,15 +472,7 @@ export class ApkToolsService {
       if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true });
 
       console.log(`Decompiling ${apkName}...`);
-      await this.exec([
-        "-jar",
-        this.getApktoolPath(),
-        "d",
-        apkPath,
-        "-o",
-        outputDir,
-        "-f",
-      ]);
+      await this.decodeApk(apkPath, outputDir);
 
       const manifestPath = join(outputDir, "AndroidManifest.xml");
       if (existsSync(manifestPath)) {
@@ -437,14 +513,7 @@ export class ApkToolsService {
       }
 
       console.log(`Rebuilding ${apkName}...`);
-      await this.exec([
-        "-jar",
-        this.getApktoolPath(),
-        "b",
-        outputDir,
-        "-o",
-        modifiedApk,
-      ]);
+      await this.buildApk(outputDir, modifiedApk);
 
       signedApks.push(modifiedApk);
     }
